@@ -137,7 +137,7 @@ void World::update_scene(f32 dt)
 			const EventHeader* eh = (EventHeader*)&events[read];
 			const char* data = (char*)&eh[1];
 
-			read += sizeof(eh) + eh->size;
+			read += sizeof(*eh) + eh->size;
 
 			switch (eh->type)
 			{
@@ -179,7 +179,7 @@ void World::update_scene(f32 dt)
 			const EventHeader* eh = (EventHeader*)&events[read];
 			const char* data = (char*)&eh[1];
 
-			read += sizeof(eh) + eh->size;
+			read += sizeof(*eh) + eh->size;
 
 			switch (eh->type)
 			{
@@ -235,9 +235,9 @@ void World::update(f32 dt)
 	update_scene(dt);
 }
 
-void World::render(const Matrix4x4& view, const Matrix4x4& projection)
+void World::render(const Matrix4x4& view)
 {
-	_render_world->render(view, projection);
+	_render_world->render(view);
 
 	_physics_world->debug_draw();
 	_render_world->debug_draw(*_lines);
@@ -262,8 +262,10 @@ CameraInstance World::camera_create(UnitId id, const CameraDesc& cd, const Matri
 	return camera_make_instance(last);
 }
 
-void World::camera_destroy(UnitId unit, CameraInstance i)
+void World::camera_destroy(UnitId unit, CameraInstance /*ci*/)
 {
+	CameraInstance i = camera_instances(unit);
+
 	const u32 last = array::size(_camera) - 1;
 	const UnitId u = _camera[i.i].unit;
 	const UnitId last_u = _camera[last].unit;
@@ -563,7 +565,7 @@ void spawn_units(World& w, const UnitResource& ur, const Vector3& pos, const Qua
 	AnimationStateMachine* animation_state_machine = w._animation_state_machine;
 
 	const ComponentData* component = (ComponentData*)(&ur + 1);
-	for (u32 cc = 0; cc < ur.num_component_types; ++cc, component = (ComponentData*)((char*)component + component->size + sizeof(ComponentData)))
+	for (u32 cc = 0; cc < ur.num_component_types; ++cc, component = (ComponentData*)((char*)component + component->size + sizeof(*component)))
 	{
 		const u32* unit_index = (const u32*)(component + 1);
 		const char* data = (const char*)(unit_index + component->num_instances);

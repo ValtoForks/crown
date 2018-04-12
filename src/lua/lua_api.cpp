@@ -1082,6 +1082,13 @@ static int input_device_any_released(lua_State* L, InputDevice& dev)
 	return 1;
 }
 
+static int input_device_button(lua_State* L, InputDevice& dev)
+{
+	LuaStack stack(L);
+	stack.push_float(dev.button(stack.get_int(1)));
+	return 1;
+}
+
 static int input_device_axis(lua_State* L, InputDevice& dev)
 {
 	LuaStack stack(L);
@@ -1141,6 +1148,37 @@ static int input_device_axis_id(lua_State* L, InputDevice& dev)
 	return 1;
 }
 
+static int input_device_deadzone(lua_State* L, InputDevice& dev)
+{
+	LuaStack stack(L);
+	int axis_id = stack.get_int(1);
+	DeadzoneMode::Enum mode;
+	f32 size = dev.deadzone(axis_id, &mode);
+
+	if (mode != DeadzoneMode::COUNT)
+	{
+		stack.push_int(mode);
+		stack.push_float(size);
+	}
+	else
+	{
+		stack.push_nil();
+		stack.push_nil();
+	}
+
+	return 2;
+}
+
+static int input_device_set_deadzone(lua_State* L, InputDevice& dev)
+{
+	LuaStack stack(L);
+	int axis_id = stack.get_int(1);
+	DeadzoneMode::Enum mode = (DeadzoneMode::Enum)stack.get_int(2);
+	f32 size = stack.get_float(3);
+	dev.set_deadzone(axis_id, mode, size);
+	return 0;
+}
+
 #define KEYBOARD(name)                                                          \
 	static int keyboard_ ## name(lua_State* L)                                  \
 	{                                                                           \
@@ -1173,6 +1211,7 @@ KEYBOARD(pressed)
 KEYBOARD(released)
 KEYBOARD(any_pressed)
 KEYBOARD(any_released)
+KEYBOARD(button)
 // KEYBOARD(axis)
 KEYBOARD(button_name)
 // KEYBOARD(axis_name)
@@ -1187,6 +1226,7 @@ MOUSE(pressed)
 MOUSE(released)
 MOUSE(any_pressed)
 MOUSE(any_released)
+MOUSE(button)
 MOUSE(axis)
 MOUSE(button_name)
 MOUSE(axis_name)
@@ -1201,6 +1241,7 @@ TOUCH(pressed)
 TOUCH(released)
 TOUCH(any_pressed)
 TOUCH(any_released)
+TOUCH(button)
 TOUCH(axis)
 TOUCH(button_name)
 TOUCH(axis_name)
@@ -1215,11 +1256,14 @@ PAD(0, pressed)
 PAD(0, released)
 PAD(0, any_pressed)
 PAD(0, any_released)
+PAD(0, button)
 PAD(0, axis)
 PAD(0, button_name)
 PAD(0, axis_name)
 PAD(0, button_id)
 PAD(0, axis_id)
+PAD(0, deadzone)
+PAD(0, set_deadzone)
 
 PAD(1, name)
 PAD(1, connected)
@@ -1229,11 +1273,14 @@ PAD(1, pressed)
 PAD(1, released)
 PAD(1, any_pressed)
 PAD(1, any_released)
+PAD(1, button)
 PAD(1, axis)
 PAD(1, button_name)
 PAD(1, axis_name)
 PAD(1, button_id)
 PAD(1, axis_id)
+PAD(1, deadzone)
+PAD(1, set_deadzone)
 
 PAD(2, name)
 PAD(2, connected)
@@ -1243,11 +1290,14 @@ PAD(2, pressed)
 PAD(2, released)
 PAD(2, any_pressed)
 PAD(2, any_released)
+PAD(2, button)
 PAD(2, axis)
 PAD(2, button_name)
 PAD(2, axis_name)
 PAD(2, button_id)
 PAD(2, axis_id)
+PAD(2, deadzone)
+PAD(2, set_deadzone)
 
 PAD(3, name)
 PAD(3, connected)
@@ -1257,11 +1307,19 @@ PAD(3, pressed)
 PAD(3, released)
 PAD(3, any_pressed)
 PAD(3, any_released)
+PAD(3, button)
 PAD(3, axis)
 PAD(3, button_name)
 PAD(3, axis_name)
 PAD(3, button_id)
 PAD(3, axis_id)
+PAD(3, deadzone)
+PAD(3, set_deadzone)
+
+#undef KEYBOARD
+#undef MOUSE
+#undef TOUCH
+#undef PAD
 
 static int world_spawn_unit(lua_State* L)
 {
@@ -3310,6 +3368,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Keyboard", "released",     keyboard_released);
 	env.add_module_function("Keyboard", "any_pressed",  keyboard_any_pressed);
 	env.add_module_function("Keyboard", "any_released", keyboard_any_released);
+	env.add_module_function("Keyboard", "button",       keyboard_button);
 	env.add_module_function("Keyboard", "button_name",  keyboard_button_name);
 	env.add_module_function("Keyboard", "button_id",    keyboard_button_id);
 
@@ -3321,6 +3380,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Mouse", "released",     mouse_released);
 	env.add_module_function("Mouse", "any_pressed",  mouse_any_pressed);
 	env.add_module_function("Mouse", "any_released", mouse_any_released);
+	env.add_module_function("Mouse", "button",       mouse_button);
 	env.add_module_function("Mouse", "axis",         mouse_axis);
 	env.add_module_function("Mouse", "button_name",  mouse_button_name);
 	env.add_module_function("Mouse", "axis_name",    mouse_axis_name);
@@ -3335,6 +3395,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Touch", "released",     touch_released);
 	env.add_module_function("Touch", "any_pressed",  touch_any_pressed);
 	env.add_module_function("Touch", "any_released", touch_any_released);
+	env.add_module_function("Touch", "button",       touch_button);
 	env.add_module_function("Touch", "axis",         touch_axis);
 	env.add_module_function("Touch", "button_name",  touch_button_name);
 	env.add_module_function("Touch", "axis_name",    touch_axis_name);
@@ -3349,11 +3410,14 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Pad1", "released",     pad0_released);
 	env.add_module_function("Pad1", "any_pressed",  pad0_any_pressed);
 	env.add_module_function("Pad1", "any_released", pad0_any_released);
+	env.add_module_function("Pad1", "button",       pad0_button);
 	env.add_module_function("Pad1", "axis",         pad0_axis);
 	env.add_module_function("Pad1", "button_name",  pad0_button_name);
 	env.add_module_function("Pad1", "axis_name",    pad0_axis_name);
 	env.add_module_function("Pad1", "button_id",    pad0_button_id);
 	env.add_module_function("Pad1", "axis_id",      pad0_axis_id);
+	env.add_module_function("Pad1", "deadzone",     pad0_deadzone);
+	env.add_module_function("Pad1", "set_deadzone", pad0_set_deadzone);
 
 	env.add_module_function("Pad2", "name",         pad1_name);
 	env.add_module_function("Pad2", "connected",    pad1_connected);
@@ -3363,11 +3427,14 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Pad2", "released",     pad1_released);
 	env.add_module_function("Pad2", "any_pressed",  pad1_any_pressed);
 	env.add_module_function("Pad2", "any_released", pad1_any_released);
+	env.add_module_function("Pad2", "button",       pad1_button);
 	env.add_module_function("Pad2", "axis",         pad1_axis);
 	env.add_module_function("Pad2", "button_name",  pad1_button_name);
 	env.add_module_function("Pad2", "axis_name",    pad1_axis_name);
 	env.add_module_function("Pad2", "button_id",    pad1_button_id);
 	env.add_module_function("Pad2", "axis_id",      pad1_axis_id);
+	env.add_module_function("Pad2", "deadzone",     pad1_deadzone);
+	env.add_module_function("Pad2", "set_deadzone", pad1_set_deadzone);
 
 	env.add_module_function("Pad3", "name",         pad2_name);
 	env.add_module_function("Pad3", "connected",    pad2_connected);
@@ -3377,11 +3444,14 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Pad3", "released",     pad2_released);
 	env.add_module_function("Pad3", "any_pressed",  pad2_any_pressed);
 	env.add_module_function("Pad3", "any_released", pad2_any_released);
+	env.add_module_function("Pad3", "button",       pad2_button);
 	env.add_module_function("Pad3", "axis",         pad2_axis);
 	env.add_module_function("Pad3", "button_name",  pad2_button_name);
 	env.add_module_function("Pad3", "axis_name",    pad2_axis_name);
 	env.add_module_function("Pad3", "button_id",    pad2_button_id);
 	env.add_module_function("Pad3", "axis_id",      pad2_axis_id);
+	env.add_module_function("Pad3", "deadzone",     pad2_deadzone);
+	env.add_module_function("Pad3", "set_deadzone", pad2_set_deadzone);
 
 	env.add_module_function("Pad4", "name",         pad3_name);
 	env.add_module_function("Pad4", "connected",    pad3_connected);
@@ -3391,11 +3461,14 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Pad4", "released",     pad3_released);
 	env.add_module_function("Pad4", "any_pressed",  pad3_any_pressed);
 	env.add_module_function("Pad4", "any_released", pad3_any_released);
+	env.add_module_function("Pad4", "button",       pad3_button);
 	env.add_module_function("Pad4", "axis",         pad3_axis);
 	env.add_module_function("Pad4", "button_name",  pad3_button_name);
 	env.add_module_function("Pad4", "axis_name",    pad3_axis_name);
 	env.add_module_function("Pad4", "button_id",    pad3_button_id);
 	env.add_module_function("Pad4", "axis_id",      pad3_axis_id);
+	env.add_module_function("Pad4", "deadzone",     pad3_deadzone);
+	env.add_module_function("Pad4", "set_deadzone", pad3_set_deadzone);
 
 	env.add_module_function("World", "spawn_unit",                      world_spawn_unit);
 	env.add_module_function("World", "spawn_empty_unit",                world_spawn_empty_unit);

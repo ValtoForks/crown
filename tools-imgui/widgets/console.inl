@@ -1,26 +1,67 @@
 #include "core/memory/temp_allocator.h"
 #include "core/strings/string_stream.h"
 
-namespace ImGui
+namespace crown
 {
-
-using namespace crown;
 
 static bool scroll_to_bottom = false;
+static char input_text_buffer[1024] = "";
 
-void console_draw(TCPSocket& client
-	, Vector<ConsoleLog>& items
-	, Vector<DynamicString>& history
-	, Vector<DynamicString>& commands
-	)
+int console_inputtext_callback(ImGuiTextEditCallbackData* data)
 {
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory)
+	{
+		Console* console = (Console*) data->UserData;
+		const Vector<DynamicString>& history = console->_console_history;
+		s32& history_pos = console->_history_pos;
+		const s32 prev_history_pos = history_pos;
+
+		if (ImGuiKey_UpArrow == data->EventKey)
+		{
+			if (history_pos == -1)
+				history_pos = vector::size(history) - 1;
+			else if (history_pos > 0)
+				history_pos--;
+		}
+		else if (ImGuiKey_DownArrow == data->EventKey)
+		{
+			if (history_pos != -1)
+			{
+				if (++history_pos >= (int)vector::size(history))
+					history_pos = -1;
+			}
+		}
+
+		if (prev_history_pos != history_pos)
+		{
+			s32 len = snprintf(data->Buf, (size_t) data->BufSize, "%s", (history_pos >= 0) ? history[history_pos].c_str() : "");
+			data->CursorPos = data->SelectionStart = data->SelectionEnd = data->BufTextLen = len;
+			data->BufDirty = true;
+		}
+	}
+
+	return 0;
+}
+
+void console_draw(Console& console)
+{
+	if (!console._open)
+		return;
+
+	Vector<ConsoleLog>& items = console._console_items;
+
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0,0));
 	static ImGuiTextFilter filter;
 	filter.Draw("Filter (\"incl,-excl\") (\"error\")", 180);
 	ImGui::PopStyleVar();
 	ImGui::Separator();
 
-	ImGui::BeginChild("ScrollingRegion", ImVec2(0,-ImGui::GetFrameHeightWithSpacing()), false, ImGuiWindowFlags_HorizontalScrollbar);
+	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
+	ImGui::BeginChild("ScrollingRegion"
+		, ImVec2(0.0f, -footer_height_to_reserve)
+		, false
+		, ImGuiWindowFlags_HorizontalScrollbar
+		);
 
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4,1)); // Tighten spacing
 	for (uint32_t i = 0; i < vector::size(items); i++)
@@ -45,44 +86,51 @@ void console_draw(TCPSocket& client
 
 	if (scroll_to_bottom)
 		ImGui::SetScrollHere();
+
 	scroll_to_bottom = false;
 	ImGui::PopStyleVar();
 	ImGui::EndChild();
 	ImGui::Separator();
 
-	// Command-line
-	char buffer[1024] = "";
-	if (ImGui::InputText("Input", buffer, IM_ARRAYSIZE(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+	ImGui::PushItemWidth(-1);
+	if (ImGui::InputText("##label"
+		, input_text_buffer
+		, IM_ARRAYSIZE(input_text_buffer)
+		, ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory
+		, console_inputtext_callback
+		, &console
+		))
 	{
-		char* input_end = buffer + strlen(buffer);
-		while (input_end > buffer && input_end[-1] == ' ')
+		char* input_end = input_text_buffer + strlen(input_text_buffer);
+		while (input_end > input_text_buffer && input_end[-1] == ' ')
 		{
 			input_end--;
 		}
 
 		*input_end = 0;
 
-		if (buffer[0])
+		if (input_text_buffer[0])
 		{
-			ConsoleLog log(LogSeverity::LOG_INFO, buffer);
-			console_execute_command(client, items, history, commands, log);
+			ConsoleLog log(LogSeverity::LOG_INFO, input_text_buffer);
+			console_execute_command(console, log);
 		}
 
-		strcpy(buffer, "");
-	}
+		strcpy(input_text_buffer, "");
+		console._history_pos = -1;
 
-	// Demonstrate keeping auto focus on the input box
-	if (ImGui::IsItemHovered() || (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0)))
-		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+		ImGui::SetKeyboardFocusHere(-1);
+		scroll_to_bottom = true;
+	}
+	ImGui::PopItemWidth();
 }
 
-void console_execute_command(TCPSocket& client
-	, Vector<ConsoleLog>& items
-	, Vector<DynamicString>& history
-	, Vector<DynamicString>& commands
-	, ConsoleLog& command_line
-	)
+void console_execute_command(Console& console, ConsoleLog& command_line)
 {
+	TCPSocket& client = console._client;
+	Vector<ConsoleLog>& items = console._console_items;
+	Vector<DynamicString>& history = console._console_history;
+	Vector<DynamicString>& commands = console._console_commands;
+
 	vector::push_back(items, command_line);
 	vector::push_back(history, command_line._message);
 
@@ -102,22 +150,37 @@ void console_execute_command(TCPSocket& client
 			vector::push_back(items, log);
 		}
 	}
-	// else if (strcmp(command_line, "help") == 0)
-	// {
-	//  add_log(items, "commands:");
-	//  for (uint32_t i = 0; i < vector::size(commands); i++)
-	//      add_log(items, "- %s", commands[i].c_str());
-	// }
+	else if (strcmp(command_line._message.c_str(), "help") == 0)
+	{
+		ConsoleLog log;
+		log._severity = LogSeverity::LOG_INFO;
+		log._message = "commands: ";
+		vector::push_back(items, log);
+		for (uint32_t i = 0; i < vector::size(commands); i++)
+		{
+			log._severity = LogSeverity::LOG_INFO;
+			log._message = commands[i].c_str();
+			vector::push_back(items, log);
+		}
+	}
 	else
 	{
-		// Send command to engine
+		// Sanitize command line
 		TempAllocator1024 ta;
-		StringStream out(ta);
-		out << "{\"type\":\"script\",\"script\":\"";
-		out << command_line._message.c_str();
-		out << "\"}";
+		StringStream json(ta);
 
-		const char* cmd = string_stream::c_str(out);
+		json << "{\"type\":\"script\",\"script\":\"";
+		const char* ch = command_line._message.c_str();
+		for (; *ch; ch++)
+		{
+			if (*ch == '"' || *ch == '\\')
+				json << "\\";
+			json << *ch;
+		}
+		json << "\"}";
+
+		// Send command to engine
+		const char* cmd = string_stream::c_str(json);
 		const uint32_t size = strlen32(cmd);
 		client.write(&size, sizeof(uint32_t));
 		client.write(cmd, size);
@@ -126,4 +189,9 @@ void console_execute_command(TCPSocket& client
 	scroll_to_bottom = true;
 }
 
-} // namespace ImGui
+void console_scroll_to_bottom()
+{
+	scroll_to_bottom = true;
+}
+
+} // namespace crown

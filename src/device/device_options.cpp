@@ -3,6 +3,7 @@
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
+#include "config.h"
 #include "core/command_line.h"
 #include "core/filesystem/path.h"
 #include "device/device_options.h"
@@ -38,7 +39,7 @@ static void help(const char* msg = NULL)
 		"  --parent-window <handle>        Set the parent window <handle> of the main window.\n"
 		"  --server                        Run the engine in server mode.\n"
 		"\n"
-		"Complete documentation available at https://dbartolini.github.io/crown/html\n"
+		"Complete documentation available at https://dbartolini.github.io/crown/html/v" CROWN_VERSION "\n"
 	);
 
 	if (msg)

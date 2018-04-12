@@ -24,12 +24,12 @@ Engine initialization and shutdown.
 ## Download
 
 ### Linux
-[crown-0.0.29-linux-x64.tar.gz](https://github.com/dbartolini/crown/releases/download/v0.0.29/crown-0.0.29-linux-x64.tar.gz)
+[crown-0.0.31-linux-x64.tar.gz](https://github.com/dbartolini/crown/releases/download/v0.0.31/crown-0.0.31-linux-x64.tar.gz)
 
 ## Documentation
 
-  * [Manual](http://dbartolini.github.io/crown/html)
-  * [Lua API](http://dbartolini.github.io/crown/html/lua_api.html)
+  * [Manual](http://dbartolini.github.io/crown/html/latest)
+  * [Lua API](http://dbartolini.github.io/crown/html/latest/lua_api.html)
   * [C++ API](http://dbartolini.github.io/crown/doxygen/modules)
 
 ## Building

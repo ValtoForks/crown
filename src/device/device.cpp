@@ -237,7 +237,6 @@ bool Device::process_events(bool vsync)
 	return tool_process_events();
 #endif
 
-	InputManager* im = _input_manager;
 	bool exit = false;
 	bool reset = false;
 
@@ -250,64 +249,15 @@ bool Device::process_events(bool vsync)
 		switch (event.type)
 		{
 		case OsEventType::BUTTON:
-			{
-				const ButtonEvent ev = event.button;
-				switch (ev.device_id)
-				{
-				case InputDeviceType::KEYBOARD:
-					im->keyboard()->set_button(ev.button_num, ev.pressed);
-					break;
-
-				case InputDeviceType::MOUSE:
-					im->mouse()->set_button(ev.button_num, ev.pressed);
-					break;
-
-				case InputDeviceType::TOUCHSCREEN:
-					im->touch()->set_button(ev.button_num, ev.pressed);
-					break;
-
-				case InputDeviceType::JOYPAD:
-					im->joypad(ev.device_num)->set_button(ev.button_num, ev.pressed);
-					break;
-				}
-			}
-			break;
-
 		case OsEventType::AXIS:
-			{
-				const AxisEvent ev = event.axis;
-				switch (ev.device_id)
-				{
-				case InputDeviceType::MOUSE:
-					im->mouse()->set_axis(ev.axis_num, vector3(ev.axis_x, ev.axis_y, ev.axis_z));
-					break;
-
-				case InputDeviceType::JOYPAD:
-					im->joypad(ev.device_num)->set_axis(ev.axis_num, vector3(ev.axis_x, ev.axis_y, ev.axis_z));
-					break;
-				}
-			}
-			break;
-
 		case OsEventType::STATUS:
-			{
-				const StatusEvent ev = event.status;
-				switch (ev.device_id)
-				{
-				case InputDeviceType::JOYPAD:
-					im->joypad(ev.device_num)->_connected = ev.connected;
-					break;
-				}
-			}
+			_input_manager->read(event);
 			break;
 
 		case OsEventType::RESOLUTION:
-			{
-				const ResolutionEvent& ev = event.resolution;
-				_width  = ev.width;
-				_height = ev.height;
-				reset   = true;
-			}
+			_width  = event.resolution.width;
+			_height = event.resolution.height;
+			reset   = true;
 			break;
 
 		case OsEventType::EXIT:
@@ -347,16 +297,15 @@ void Device::run()
 #if CROWN_PLATFORM_ANDROID
 	_data_filesystem = CE_NEW(_allocator, FilesystemApk)(default_allocator(), const_cast<AAssetManager*>((AAssetManager*)_device_options._asset_manager));
 #else
-	const char* data_dir = _device_options._data_dir.c_str();
-	if (!data_dir)
-	{
-		char buf[1024];
-		data_dir = os::getcwd(buf, sizeof(buf));
-	}
 	_data_filesystem = CE_NEW(_allocator, FilesystemDisk)(default_allocator());
-	((FilesystemDisk*)_data_filesystem)->set_prefix(data_dir);
-	if (!_data_filesystem->exists(data_dir))
-		_data_filesystem->create_directory(data_dir);
+	{
+		char cwd[1024];
+		const char* data_dir = !_device_options._data_dir.empty()
+			? _device_options._data_dir.c_str()
+			: os::getcwd(cwd, sizeof(cwd))
+			;
+		((FilesystemDisk*)_data_filesystem)->set_prefix(data_dir);
+	}
 
 	_last_log = _data_filesystem->open(CROWN_LAST_LOG, FileOpenMode::WRITE);
 #endif // CROWN_PLATFORM_ANDROID
@@ -383,6 +332,10 @@ void Device::run()
 	namespace utr = unit_resource_internal;
 
 	_resource_loader  = CE_NEW(_allocator, ResourceLoader)(*_data_filesystem);
+	_resource_loader->register_fallback(RESOURCE_TYPE_TEXTURE,  StringId64("core/fallback/fallback"));
+	_resource_loader->register_fallback(RESOURCE_TYPE_MATERIAL, StringId64("core/fallback/fallback"));
+	_resource_loader->register_fallback(RESOURCE_TYPE_UNIT,     StringId64("core/fallback/fallback"));
+
 	_resource_manager = CE_NEW(_allocator, ResourceManager)(*_resource_loader);
 	_resource_manager->register_type(RESOURCE_TYPE_CONFIG,           RESOURCE_VERSION_CONFIG,           cor::load, cor::unload, NULL,        NULL        );
 	_resource_manager->register_type(RESOURCE_TYPE_FONT,             RESOURCE_VERSION_FONT,             NULL,      NULL,        NULL,        NULL        );
@@ -500,10 +453,6 @@ void Device::run()
 			_pipeline->reset(_width, _height);
 		}
 
-#if CROWN_TOOLS
-		tool_update(dt);
-#endif
-
 		if (!_paused)
 		{
 			_resource_manager->complete_requests();
@@ -528,6 +477,10 @@ void Device::run()
 		RECORD_FLOAT("bgfx.cpu_time", f32(f64(stats->cpuTimeEnd - stats->cpuTimeBegin)*1000.0/stats->cpuTimerFreq));
 
 		profiler_globals::flush();
+
+#if CROWN_TOOLS
+		tool_update(dt);
+#endif
 
 		bgfx::frame();
 	}
@@ -670,7 +623,7 @@ void Device::render(World& world, UnitId camera_unit)
 	bgfx::touch(VIEW_DEBUG);
 	bgfx::touch(VIEW_GUI);
 
-	world.render(view, proj);
+	world.render(view);
 
 #if !CROWN_TOOLS
 	_pipeline->render(*_shader_manager, StringId32("blit"), 0, _width, _height);

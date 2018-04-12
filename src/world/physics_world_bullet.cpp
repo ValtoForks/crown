@@ -430,11 +430,11 @@ struct PhysicsWorldImpl
 		const bool is_kinematic = (actor_class->flags & PhysicsActor::KINEMATIC) != 0;
 		const bool is_dynamic   = (actor_class->flags & PhysicsActor::DYNAMIC) != 0;
 		const bool is_static    = !is_kinematic && !is_dynamic;
+		const bool is_trigger   = (actor_class->flags & PhysicsActor::TRIGGER) != 0;
 		const f32  mass         = is_dynamic ? ar->mass : 0.0f;
 
 		// Create compound shape
 		btCompoundShape* shape = CE_NEW(*_allocator, btCompoundShape)(true);
-
 		ColliderInstance ci = collider_first(id);
 		while (is_valid(ci))
 		{
@@ -443,7 +443,11 @@ struct PhysicsWorldImpl
 		}
 
 		// Create motion state
-		btDefaultMotionState* ms = CE_NEW(*_allocator, btDefaultMotionState)(to_btTransform(tm));
+		const btTransform tr = to_btTransform(tm);
+		btDefaultMotionState* ms = is_static
+			? NULL
+			: CE_NEW(*_allocator, btDefaultMotionState)(tr)
+			;
 
 		// If dynamic, calculate inertia
 		btVector3 inertia;
@@ -451,6 +455,7 @@ struct PhysicsWorldImpl
 			shape->calculateLocalInertia(mass, inertia);
 
 		btRigidBody::btRigidBodyConstructionInfo rbinfo(mass, ms, shape, inertia);
+		rbinfo.m_startWorldTransform      = tr;
 		rbinfo.m_linearDamping            = actor_class->linear_damping;
 		rbinfo.m_angularDamping           = actor_class->angular_damping;
 		rbinfo.m_restitution              = material->restitution;
@@ -465,6 +470,7 @@ struct PhysicsWorldImpl
 		int cflags = actor->getCollisionFlags();
 		cflags |= is_kinematic ? btCollisionObject::CF_KINEMATIC_OBJECT : 0;
 		cflags |= is_static ? btCollisionObject::CF_STATIC_OBJECT : 0;
+		cflags |= is_trigger ? btCollisionObject::CF_NO_CONTACT_RESPONSE : 0;
 		actor->setCollisionFlags(cflags);
 
 		actor->setLinearFactor(btVector3(
@@ -479,7 +485,6 @@ struct PhysicsWorldImpl
 		);
 
 		const u32 last = array::size(_actor);
-
 		actor->setUserPointer((void*)(uintptr_t)last);
 
 		// Set collision filters
@@ -872,7 +877,9 @@ struct PhysicsWorldImpl
 			const Quaternion rot = rotation(*begin_world);
 			const Vector3 pos = translation(*begin_world);
 			// http://www.bulletphysics.org/mediawiki-1.5.8/index.php/MotionStates
-			_actor[ai].actor->getMotionState()->setWorldTransform(btTransform(to_btQuaternion(rot), to_btVector3(pos)));
+			btMotionState* ms = _actor[ai].actor->getMotionState();
+			if (ms)
+				ms->setWorldTransform(btTransform(to_btQuaternion(rot), to_btVector3(pos)));
 		}
 	}
 

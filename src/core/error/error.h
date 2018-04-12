@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "config.h"
 #include "core/types.h"
 
 /// @defgroup Error Error
@@ -33,7 +32,7 @@ namespace error
 			{                                                \
 				crown::error::abort("Assertion failed: %s\n" \
 					"    In: %s:%d\n"                        \
-					"    " msg                               \
+					"    " msg "\n"                          \
 					, # condition                            \
 					, __FILE__                               \
 					, __LINE__                               \

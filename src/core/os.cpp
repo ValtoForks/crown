@@ -312,8 +312,8 @@ namespace os
 			, (LPSTR)string_stream::c_str(path)
 			, NULL
 			, NULL
-			, TRUE
-			, 0
+			, FALSE
+			, CREATE_NO_WINDOW
 			, NULL
 			, NULL
 			, &info

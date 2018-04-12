@@ -60,11 +60,11 @@ toolchain(CROWN_BUILD_DIR, CROWN_THIRD_DIR)
 
 dofile ("crown.lua")
 group "engine"
-crown_project("", "ConsoleApp", {})
+crown_project("", "WindowedApp", {})
 
 group "libs"
 dofile (BGFX_DIR .. "scripts/bgfx.lua")
-bgfxProject("", "StaticLib", os.is("windows") and { "BGFX_CONFIG_RENDERER_DIRECT3D9=1" } or {})
+bgfxProject("", "StaticLib")
 
 dofile (BX_DIR .. "scripts/bx.lua")
 dofile (BIMG_DIR .. "scripts/bimg.lua")
@@ -86,7 +86,8 @@ if _OPTIONS["with-tools"] then
 	dofile (BGFX_DIR .. "scripts/texturec.lua")
 
 	if not _OPTIONS["no-level-editor"] then
-		dofile ("level-editor-imgui.lua")
 		dofile ("level-editor.lua")
 	end
+
+	dofile ("level-editor-imgui.lua")
 end

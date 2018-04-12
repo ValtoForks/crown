@@ -44,13 +44,11 @@ static FontRangeMerge s_fontRangeMerge[] =
 	{ s_iconsFontAwesomeTtf, sizeof(s_iconsFontAwesomeTtf), { ICON_MIN_FA, ICON_MAX_FA, 0 } },
 };
 
-static void* memAlloc(size_t _size);
-static void memFree(void* _ptr);
+static void* memAlloc(size_t _size, void* _userData);
+static void memFree(void* _ptr, void* _userData);
 
 struct ImGuiContext
 {
-	static void renderDrawLists(ImDrawData* _drawData);
-
 	void render(ImDrawData* _drawData)
 	{
 		const ImGuiIO& io = ImGui::GetIO();
@@ -126,8 +124,8 @@ struct ImGuiContext
 				else if (0 != cmd->ElemCount)
 				{
 					uint64_t state = 0
-						| BGFX_STATE_RGB_WRITE
-						| BGFX_STATE_ALPHA_WRITE
+						| BGFX_STATE_WRITE_RGB
+						| BGFX_STATE_WRITE_A
 						| BGFX_STATE_MSAA
 						;
 
@@ -185,10 +183,11 @@ struct ImGuiContext
 
 		m_viewId = VIEW_IMGUI;
 
+		ImGui::SetAllocatorFunctions(memAlloc, memFree, NULL);
+
+		m_imgui = ImGui::CreateContext();
+
 		ImGuiIO& io = ImGui::GetIO();
-		io.RenderDrawListsFn = renderDrawLists;
-		io.MemAllocFn = memAlloc;
-		io.MemFreeFn  = memFree;
 
 		io.DisplaySize = ImVec2(1280.0f, 720.0f);
 		io.DeltaTime   = 1.0f / 60.0f;
@@ -196,25 +195,23 @@ struct ImGuiContext
 
 		setupStyle(true);
 
-		io.KeyMap[ImGuiKey_Tab]        = (int)crown::KeyboardButton::TAB;
-		io.KeyMap[ImGuiKey_LeftArrow]  = (int)crown::KeyboardButton::LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = (int)crown::KeyboardButton::RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow]    = (int)crown::KeyboardButton::UP;
-		io.KeyMap[ImGuiKey_DownArrow]  = (int)crown::KeyboardButton::DOWN;
-		io.KeyMap[ImGuiKey_Home]       = (int)crown::KeyboardButton::HOME;
-		io.KeyMap[ImGuiKey_End]        = (int)crown::KeyboardButton::END;
-		io.KeyMap[ImGuiKey_Delete]     = (int)crown::KeyboardButton::DEL;
-		io.KeyMap[ImGuiKey_Backspace]  = (int)crown::KeyboardButton::BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter]      = (int)crown::KeyboardButton::ENTER;
-		io.KeyMap[ImGuiKey_Escape]     = (int)crown::KeyboardButton::ESCAPE;
-		io.KeyMap[ImGuiKey_A]          = (int)crown::KeyboardButton::A;
-		io.KeyMap[ImGuiKey_C]          = (int)crown::KeyboardButton::C;
-		io.KeyMap[ImGuiKey_V]          = (int)crown::KeyboardButton::V;
-		io.KeyMap[ImGuiKey_X]          = (int)crown::KeyboardButton::X;
-		io.KeyMap[ImGuiKey_Y]          = (int)crown::KeyboardButton::Y;
-		io.KeyMap[ImGuiKey_Z]          = (int)crown::KeyboardButton::Z;
-
-		bgfx::RendererType::Enum type = bgfx::getRendererType();
+		io.KeyMap[ImGuiKey_Tab]        = crown::KeyboardButton::TAB;
+		io.KeyMap[ImGuiKey_LeftArrow]  = crown::KeyboardButton::LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = crown::KeyboardButton::RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow]    = crown::KeyboardButton::UP;
+		io.KeyMap[ImGuiKey_DownArrow]  = crown::KeyboardButton::DOWN;
+		io.KeyMap[ImGuiKey_Home]       = crown::KeyboardButton::HOME;
+		io.KeyMap[ImGuiKey_End]        = crown::KeyboardButton::END;
+		io.KeyMap[ImGuiKey_Delete]     = crown::KeyboardButton::DEL;
+		io.KeyMap[ImGuiKey_Backspace]  = crown::KeyboardButton::BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter]      = crown::KeyboardButton::ENTER;
+		io.KeyMap[ImGuiKey_Escape]     = crown::KeyboardButton::ESCAPE;
+		io.KeyMap[ImGuiKey_A]          = crown::KeyboardButton::A;
+		io.KeyMap[ImGuiKey_C]          = crown::KeyboardButton::C;
+		io.KeyMap[ImGuiKey_V]          = crown::KeyboardButton::V;
+		io.KeyMap[ImGuiKey_X]          = crown::KeyboardButton::X;
+		io.KeyMap[ImGuiKey_Y]          = crown::KeyboardButton::Y;
+		io.KeyMap[ImGuiKey_Z]          = crown::KeyboardButton::Z;
 
 		u_imageLodEnabled = bgfx::createUniform("u_imageLodEnabled", bgfx::UniformType::Vec4);
 
@@ -274,7 +271,7 @@ struct ImGuiContext
 	void destroy()
 	{
 		ImGui::ShutdownDockContext();
-		ImGui::Shutdown();
+		ImGui::DestroyContext(m_imgui);
 
 		bgfx::destroy(s_tex);
 		bgfx::destroy(m_texture);
@@ -298,7 +295,13 @@ struct ImGuiContext
 			ImGui::StyleColorsLight(&style);
 		}
 
-		style.FrameRounding = 4.0f;
+		style.FrameRounding = 2.0f;
+		style.ScrollbarRounding = 2.0f;
+		style.ScrollbarSize = 13.0f;
+		style.WindowBorderSize = 0.0f;
+		style.WindowPadding = ImVec2(4.0f, 4.0f);
+		style.WindowRounding = 2.0f;
+		style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
 	}
 
 	void beginFrame(uint8_t view_id, uint16_t width, uint16_t height)
@@ -315,8 +318,10 @@ struct ImGuiContext
 	void endFrame()
 	{
 		ImGui::Render();
+		render(ImGui::GetDrawData());
 	}
 
+	ImGuiContext*       m_imgui;
 	bx::AllocatorI*     m_allocator;
 	bgfx::VertexDecl    m_decl;
 	bgfx::TextureHandle m_texture;
@@ -328,19 +333,16 @@ struct ImGuiContext
 
 static ImGuiContext s_ctx;
 
-static void* memAlloc(size_t _size)
+static void* memAlloc(size_t _size, void* _userData)
 {
+	BX_UNUSED(_userData);
 	return BX_ALLOC(s_ctx.m_allocator, _size);
 }
 
-static void memFree(void* _ptr)
+static void memFree(void* _ptr, void* _userData)
 {
+	BX_UNUSED(_userData);
 	BX_FREE(s_ctx.m_allocator, _ptr);
-}
-
-void ImGuiContext::renderDrawLists(ImDrawData* _drawData)
-{
-	s_ctx.render(_drawData);
 }
 
 namespace ImGui
@@ -383,8 +385,8 @@ BX_PRAGMA_DIAGNOSTIC_PUSH();
 BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG("-Wunknown-pragmas")
 //BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wunused-but-set-variable"); // warning: variable ‘L1’ set but not used
 BX_PRAGMA_DIAGNOSTIC_IGNORED_CLANG_GCC("-Wtype-limits"); // warning: comparison is always true due to limited range of data type
-#define STBTT_malloc(_size, _userData) memAlloc(_size)
-#define STBTT_free(_ptr, _userData) memFree(_ptr)
+#define STBTT_malloc(_size, _userData) memAlloc(_size, _userData)
+#define STBTT_free(_ptr, _userData) memFree(_ptr, _userData)
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <stb/stb_rect_pack.h>
 #define STB_TRUETYPE_IMPLEMENTATION

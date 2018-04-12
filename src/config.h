@@ -7,7 +7,7 @@
 
 #include "core/platform.h"
 
-#define CROWN_VERSION "0.0.30"
+#define CROWN_VERSION "0.0.32"
 
 #ifndef CROWN_DEBUG
 	#define CROWN_DEBUG 0
@@ -16,8 +16,6 @@
 #ifndef CROWN_DEVELOPMENT
 	#define CROWN_DEVELOPMENT 0
 #endif // CROWN_DEVELOPMENT
-
-#define CROWN_RELEASE (!CROWN_DEBUG && !CROWN_DEVELOPMENT)
 
 #ifndef CROWN_TOOLS
 	#define CROWN_TOOLS 0
@@ -48,22 +46,22 @@
 #endif
 
 #if !defined(CROWN_SOUND_OPENAL) \
-	&& !defined(SOUND_WORLD_NOOP)
+	&& !defined(CROWN_SOUND_NOOP)
 
 	#ifndef CROWN_SOUND_OPENAL
 		#define CROWN_SOUND_OPENAL 1
 	#endif // CROWN_SOUND_OPENAL
 
-	#ifndef SOUND_WORLD_NOOP
-		#define SOUND_WORLD_NOOP 0
-	#endif // SOUND_WORLD_NOOP
+	#ifndef CROWN_SOUND_NOOP
+		#define CROWN_SOUND_NOOP 0
+	#endif // CROWN_SOUND_NOOP
 #else
 	#ifndef CROWN_SOUND_OPENAL
 		#define CROWN_SOUND_OPENAL 0
 	#endif
 
-	#ifndef SOUND_WORLD_NOOP
-		#define SOUND_WORLD_NOOP 0
+	#ifndef CROWN_SOUND_NOOP
+		#define CROWN_SOUND_NOOP 0
 	#endif
 #endif
 
@@ -111,14 +109,14 @@
 	#define CROWN_MAX_JOYPADS 4
 #endif // CROWN_MAX_JOYPADS
 
-#ifndef CROWN_MAX_LUA_VECTOR3
-	#define CROWN_MAX_LUA_VECTOR3 8192
+#ifndef CROWN_LUA_MAX_VECTOR3_SIZE
+	#define CROWN_LUA_MAX_VECTOR3_SIZE (129*1024)
 #endif // CE_MAX
 
-#ifndef CROWN_MAX_LUA_MATRIX4X4
-	#define CROWN_MAX_LUA_MATRIX4X4 8192
+#ifndef CROWN_LUA_MAX_QUATERNION_SIZE
+	#define CROWN_LUA_MAX_QUATERNION_SIZE (128*1024)
 #endif // CE_MAX
 
-#ifndef CROWN_MAX_LUA_QUATERNION
-	#define CROWN_MAX_LUA_QUATERNION 8192
+#ifndef CROWN_LUA_MAX_MATRIX4X4_SIZE
+	#define CROWN_LUA_MAX_MATRIX4X4_SIZE (128*1024)
 #endif // CE_MAX

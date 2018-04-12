@@ -20,6 +20,8 @@ project "bullet"
 		"BT_USE_TBB=0",
 		"BT_USE_PPL=0",
 		"BT_USE_OPENMP=0",
+		"B3_DBVT_BP_SORTPAIRS=0",
+		"DBVT_BP_SORTPAIRS=0",
 	}
 
 	configuration { "linux-*" }
@@ -56,6 +58,11 @@ project "bullet"
 		BULLET_DIR .. "src/Bullet3Common/**.cpp",
 		BULLET_DIR .. "src/Bullet3Dynamics/**.cpp",
 		BULLET_DIR .. "src/Bullet3Geometry/**.cpp",
+	}
+
+	removefiles {
+		BULLET_DIR .. "src/BulletCollision/Gimpact/**.h",
+		BULLET_DIR .. "src/BulletCollision/Gimpact/**.cpp",
 	}
 
 	configuration {}

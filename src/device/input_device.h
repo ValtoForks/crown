@@ -9,6 +9,7 @@
 #include "core/memory/types.h"
 #include "core/strings/string_id.h"
 #include "core/types.h"
+#include "device/input_types.h"
 
 namespace crown
 {
@@ -21,15 +22,21 @@ struct InputDevice
 	u8 _num_buttons;
 	u8 _num_axes;
 	u8 _last_button;
+	const char** _button_name;
+	const char** _axis_name;
 
-	u8* _last_state;           // num_buttons
-	u8* _state;                // num_buttons
-	Vector3* _axis;            // num_axes
-	const char** _button_name; // num_buttons
-	const char** _axis_name;   // num_axes
-	StringId32* _button_hash;  // num_buttons
-	StringId32* _axis_hash;    // num_axes
-	char* _name;               // strlen32(name) + 1
+	u8* _last_state;          // num_buttons
+	u8* _state;               // num_buttons
+	Vector3* _axis;           // num_axes
+	u32* _deadzone_mode;      // num_axes
+	f32* _deadzone_size;      // num_axes
+	StringId32* _button_hash; // num_buttons
+	StringId32* _axis_hash;   // num_axes
+	char* _name;              // strlen32(name) + 1
+
+	void set_button(u8 id, bool state);
+	void set_axis(u8 id, f32 x, f32 y, f32 z);
+	void update();
 
 	/// Returns the name of the input device.
 	const char* name() const;
@@ -55,6 +62,9 @@ struct InputDevice
 	/// Returns whether any button is released in the current frame.
 	bool any_released() const;
 
+	/// Returns the value of the button @a id in the range [0..1].
+	f32 button(u8 id) const;
+
 	/// Returns the value of the axis @a id.
 	Vector3 axis(u8 id) const;
 
@@ -70,11 +80,11 @@ struct InputDevice
 	/// Returns the id of the axis @a name of UINT8_MAX if no matching axis is found.
 	u8 axis_id(StringId32 name);
 
-	void set_button(u8 i, bool state);
+	/// Returns the deadzone size and the deadzone @a mode for the axis @a id.
+	f32 deadzone(u8 id, DeadzoneMode::Enum* deadzone_mode);
 
-	void set_axis(u8 i, const Vector3& value);
-
-	void update();
+	/// Sets the @a deadzone_mode and @a deadzone_size for the axis @a id.
+	void set_deadzone(u8 id, DeadzoneMode::Enum deadzone_mode, f32 deadzone_size);
 };
 
 /// Functions to manipulate InputDevice.

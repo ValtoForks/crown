@@ -4,7 +4,7 @@
 --
 
 project "level-editor-imgui"
-	kind "ConsoleApp"
+	kind "WindowedApp"
 	language "C++"
 
 	includedirs {
@@ -15,21 +15,20 @@ project "level-editor-imgui"
 		CROWN_DIR .. "3rdparty/bx/include",
 		CROWN_DIR .. "3rdparty/stb",
 		CROWN_DIR .. "3rdparty/luajit/src",
-		CROWN_DIR .. "3rdparty/openal/include",
-		CROWN_DIR .. "3rdparty/bullet3/src",
 		CROWN_DIR .. "3rdparty/ocornut-imgui",
+		CROWN_DIR .. "3rdparty/nativefiledialog/src/include",
 	}
 
 	defines {
 		"CROWN_TOOLS=1",
+		"CROWN_PHYSICS_NOOP=1",
+		"CROWN_SOUND_NOOP=1",
 	}
 
 	links {
 		"bgfx",
 		"bimg",
 		"bx",
-		"openal",
-		"bullet",
 	}
 
 	configuration { "debug or development" }
@@ -51,15 +50,40 @@ project "level-editor-imgui"
 			"GL",
 			"luajit",
 		}
+		linkoptions { "`pkg-config --libs gtk+-3.0`" }
+		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
+		files {
+			CROWN_DIR .. "3rdparty/nativefiledialog/src/nfd_gtk.c",
+		}
 
-	configuration { "mingw*" }
+	configuration { "vs* or mingw*" }
 		links {
 			"dbghelp",
 			"xinput",
 			"psapi",
 			"ws2_32",
 			"ole32",
+			"gdi32",
+			"uuid",
+		}
+		files {
+			CROWN_DIR .. "3rdparty/nativefiledialog/src/nfd_win.cpp",
+		}
+	configuration { "not vs*" }
+		links {
 			"luajit"
+		}
+	configuration { "vs*"}
+		links {
+			"lua51"
+		}
+	configuration { "x32", "vs*" }
+		libdirs {
+			CROWN_DIR .. "3rdparty/luajit/pre/win_x32"
+		}
+	configuration { "x64", "vs*" }
+		libdirs {
+			CROWN_DIR .. "3rdparty/luajit/pre/win_x64"
 		}
 
 	configuration {}
@@ -71,6 +95,7 @@ project "level-editor-imgui"
 		CROWN_DIR .. "tools-imgui/**.cpp",
 		CROWN_DIR .. "3rdparty/ocornut-imgui/*.h",
 		CROWN_DIR .. "3rdparty/ocornut-imgui/*.cpp",
+		CROWN_DIR .. "3rdparty/nativefiledialog/src/nfd_common.c",
 	}
 
 	configuration {} -- reset configuration
