@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -76,7 +76,7 @@ void SceneGraph::allocate(u32 num)
 	new_data.capacity = num;
 	new_data.buffer = _allocator->allocate(bytes);
 
-	new_data.unit         = (UnitId*           )new_data.buffer;
+	new_data.unit         = (UnitId*           )memory::align_top(new_data.buffer,             alignof(UnitId           ));
 	new_data.world        = (Matrix4x4*        )memory::align_top(new_data.unit + num,         alignof(Matrix4x4        ));
 	new_data.local        = (Pose*             )memory::align_top(new_data.world + num,        alignof(Pose             ));
 	new_data.parent       = (TransformInstance*)memory::align_top(new_data.local + num,        alignof(TransformInstance));

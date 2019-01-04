@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -169,7 +169,7 @@ void AnimationStateMachine::update(float dt)
 		skinny::expression_language::run(&byte_code[anim_i.state->speed_bytecode], variables, stack);
 		const f32 speed = stack.size > 0 ? stack_data[stack.size-1] : 1.0f;
 
-		// Play animation
+		// Advance animation
 		const SpriteAnimationResource* sar = (SpriteAnimationResource*)_resource_manager->get(RESOURCE_TYPE_SPRITE_ANIMATION, name);
 		if (anim_i.resource != sar)
 		{

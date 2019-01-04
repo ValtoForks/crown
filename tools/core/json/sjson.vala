@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -113,13 +113,13 @@ namespace Crown
 			else if (o.holds(typeof(bool)))
 				builder.append("true");
 			else if (o.holds(typeof(uint8)))
-				builder.append(((uint8)o).to_string());
+				builder.append_printf("%u", (uint8)o);
 			else if (o.holds(typeof(int)))
-				builder.append(((int)o).to_string());
+				builder.append_printf("%d", (int)o);
 			else if (o.holds(typeof(float)))
-				builder.append(((float)o).to_string());
+				builder.append_printf("%.9g", (float)o);
 			else if (o.holds(typeof(double)))
-				builder.append(((double)o).to_string());
+				builder.append_printf("%.17g", (double)o);
 			else if (o.holds(typeof(string)))
 				write_string((string)o, builder);
 			else if (o.holds(typeof(ArrayList)))
@@ -146,10 +146,11 @@ namespace Crown
 		{
 			builder.append_c('[');
 			foreach (Value? item in a) {
-				builder.append_c(' ');
+				write_new_line(builder, indentation+1);
 				write(item, builder, indentation+1);
 			}
-			builder.append(" ]");
+			write_new_line(builder, indentation);
+			builder.append_c(']');
 		}
 
 		static void write_object(Hashtable t, StringBuilder builder, int indentation)

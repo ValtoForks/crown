@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -35,6 +35,9 @@ struct Window
 
 	/// Minimizes the window.
 	virtual void minimize() = 0;
+
+	/// Maximizes the window.
+	virtual void maximize() = 0;
 
 	/// Restores the window.
 	virtual void restore() = 0;

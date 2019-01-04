@@ -1,5 +1,5 @@
 --
--- Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+-- Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
 -- License: https://github.com/dbartolini/crown/blob/master/LICENSE
 --
 
@@ -14,18 +14,8 @@ function copyLib()
 end
 
 newoption {
-	trigger = "with-openal",
-	description = "Build with OpenAL support."
-}
-
-newoption {
 	trigger = "with-luajit",
 	description = "Build with luajit support."
-}
-
-newoption {
-	trigger = "with-bullet",
-	description = "Build with Bullet support."
 }
 
 newoption {
@@ -71,14 +61,10 @@ dofile (BIMG_DIR .. "scripts/bimg.lua")
 dofile (BIMG_DIR .. "scripts/bimg_encode.lua")
 dofile (BIMG_DIR .. "scripts/bimg_decode.lua")
 
-if _OPTIONS["with-openal"] then
-	dofile ("openal.lua")
-	openal_project(os.is("windows") and "SharedLib" or "StaticLib")
-end
+dofile ("openal.lua")
+openal_project(os.is("windows") and "SharedLib" or "StaticLib")
 
-if _OPTIONS["with-bullet"] then
-	dofile ("bullet.lua")
-end
+dofile ("bullet.lua")
 
 if _OPTIONS["with-tools"] then
 	group "tools"

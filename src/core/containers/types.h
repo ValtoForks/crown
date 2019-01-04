@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -119,7 +119,7 @@ struct Map
 /// Hash map.
 ///
 /// @ingroup Containers
-template <typename TKey, typename TValue, typename Hash = hash<TKey> >
+template <typename TKey, typename TValue, typename Hash = hash<TKey>, typename KeyEqual = equal_to<TKey> >
 struct HashMap
 {
 	ALLOCATOR_AWARE;
@@ -138,10 +138,36 @@ struct HashMap
 	u32 _mask;
 	Index* _index;
 	Entry* _data;
+	char* _buffer;
 
 	HashMap(Allocator& a);
 	~HashMap();
-	const TValue& operator[](const TKey& key) const;
+};
+
+/// Hash set.
+///
+/// @ingroup Containers
+template <typename TKey, typename Hash = hash<TKey>, typename KeyEqual = equal_to<TKey> >
+struct HashSet
+{
+	ALLOCATOR_AWARE;
+
+	struct Index
+	{
+		u32 hash;
+		u32 index;
+	};
+
+	Allocator* _allocator;
+	u32 _capacity;
+	u32 _size;
+	u32 _mask;
+	Index* _index;
+	TKey* _data;
+	char* _buffer;
+
+	HashSet(Allocator& a);
+	~HashSet();
 };
 
 /// Vector of sorted items.
@@ -164,6 +190,15 @@ struct SortMap
 #endif
 
 	SortMap(Allocator& a);
+};
+
+/// Node in an intrusive linked list.
+///
+/// @ingroup Containers
+struct ListNode
+{
+	ListNode* next;
+	ListNode* prev;
 };
 
 } // namespace crown

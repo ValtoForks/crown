@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -16,14 +16,11 @@ namespace Crown
 
 		private int _mouse_curr_x;
 		private int _mouse_curr_y;
-		private int _mouse_last_x;
-		private int _mouse_last_y;
 
 		private bool _mouse_left;
 		private bool _mouse_middle;
 		private bool _mouse_right;
 
-		private int _even;
 		private X.Window _window_id;
 
 		public uint window_id
@@ -31,7 +28,7 @@ namespace Crown
 			get { return (uint)_window_id; }
 		}
 
-		private HashMap<int, bool> _keys;
+		private HashMap<uint, bool> _keys;
 
 		// Widgets
 		private Gtk.Socket _socket;
@@ -40,7 +37,7 @@ namespace Crown
 		// Signals
 		public signal void realized();
 
-		private string key_to_string(int k)
+		private string key_to_string(uint k)
 		{
 			switch (k)
 			{
@@ -63,18 +60,14 @@ namespace Crown
 
 			_mouse_curr_x = 0;
 			_mouse_curr_y = 0;
-			_mouse_last_x = 0;
-			_mouse_last_y = 0;
 
 			_mouse_left   = false;
 			_mouse_middle = false;
 			_mouse_right  = false;
 
-			_even = 0;
-
 			_window_id = 0;
 
-			_keys = new HashMap<int, bool>();
+			_keys = new HashMap<uint, bool>();
 			_keys[Gdk.Key.w] = false;
 			_keys[Gdk.Key.a] = false;
 			_keys[Gdk.Key.s] = false;
@@ -85,7 +78,7 @@ namespace Crown
 			_socket.set_visual(Gdk.Visual.get_best_with_type(VisualType.TRUE_COLOR));
 			_socket.realize.connect(on_socket_realized);
 			_socket.plug_removed.connect(on_socket_plug_removed);
-			_socket.set_size_request(300, 300);
+			_socket.set_size_request(128, 128);
 
 			_event_box = new Gtk.EventBox();
 			_event_box.can_focus = true;
@@ -157,35 +150,35 @@ namespace Crown
 
 		private bool on_key_press(Gdk.EventKey ev)
 		{
-			if ((int)ev.keyval == Gdk.Key.Up)
+			if (ev.keyval == Gdk.Key.Up)
 				_client.send_script("LevelEditor:key_down(\"move_up\")");
-			if ((int)ev.keyval == Gdk.Key.Down)
+			if (ev.keyval == Gdk.Key.Down)
 				_client.send_script("LevelEditor:key_down(\"move_down\")");
-			if ((int)ev.keyval == Gdk.Key.Right)
+			if (ev.keyval == Gdk.Key.Right)
 				_client.send_script("LevelEditor:key_down(\"move_right\")");
-			if ((int)ev.keyval == Gdk.Key.Left)
+			if (ev.keyval == Gdk.Key.Left)
 				_client.send_script("LevelEditor:key_down(\"move_left\")");
 
-			if (!_keys.has_key((int)ev.keyval))
+			if (!_keys.has_key(ev.keyval))
 				return true;
 
-			if (!_keys[(int)ev.keyval])
-				_client.send_script(LevelEditorApi.key_down(key_to_string((int)ev.keyval)));
+			if (!_keys[ev.keyval])
+				_client.send_script(LevelEditorApi.key_down(key_to_string(ev.keyval)));
 
-			_keys[(int)ev.keyval] = true;
+			_keys[ev.keyval] = true;
 
 			return false;
 		}
 
 		private bool on_key_release(Gdk.EventKey ev)
 		{
-			if (!_keys.has_key((int)ev.keyval))
+			if (!_keys.has_key(ev.keyval))
 				return false;
 
-			if (_keys[(int)ev.keyval])
-				_client.send_script(LevelEditorApi.key_up(key_to_string((int)ev.keyval)));
+			if (_keys[ev.keyval])
+				_client.send_script(LevelEditorApi.key_up(key_to_string(ev.keyval)));
 
-			_keys[(int)ev.keyval] = false;
+			_keys[ev.keyval] = false;
 
 			return false;
 		}
@@ -194,17 +187,8 @@ namespace Crown
 		{
 			_mouse_curr_x = (int)ev.x;
 			_mouse_curr_y = (int)ev.y;
-			int _mouse_delta_x = _mouse_curr_x - _mouse_last_x;
-			int _mouse_delta_y = _mouse_curr_y - _mouse_last_y;
 
-			_client.send_script(LevelEditorApi.mouse_move(_mouse_curr_x
-				, _mouse_curr_y
-				, _mouse_delta_x
-				, _mouse_delta_y
-				));
-
-			_mouse_last_x = _mouse_curr_x;
-			_mouse_last_y = _mouse_curr_y;
+			_client.send_script(LevelEditorApi.mouse_move(_mouse_curr_x, _mouse_curr_y));
 
 			return false;
 		}

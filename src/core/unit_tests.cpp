@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -10,6 +10,7 @@
 #include "core/command_line.h"
 #include "core/containers/array.h"
 #include "core/containers/hash_map.h"
+#include "core/containers/hash_set.h"
 #include "core/containers/vector.h"
 #include "core/filesystem/path.h"
 #include "core/guid.h"
@@ -31,6 +32,9 @@
 #include "core/strings/dynamic_string.h"
 #include "core/strings/string.h"
 #include "core/strings/string_id.h"
+#include "core/thread/thread.h"
+#include "core/time.h"
+#include <stdlib.h> // EXIT_SUCCESS, EXIT_FAILURE
 
 #define ENSURE(condition)                                \
 	do                                                   \
@@ -138,6 +142,38 @@ static void test_hash_map()
 			ENSURE(hash_map::has(m, i));
 			hash_map::remove(m, i);
 		}
+	}
+	memory_globals::shutdown();
+}
+
+static void test_hash_set()
+{
+	memory_globals::init();
+	Allocator& a = default_allocator();
+	{
+		HashSet<s32> m(a);
+
+		ENSURE(hash_set::size(m) == 0);
+		ENSURE(!hash_set::has(m, 10));
+
+		for (s32 i = 0; i < 100; ++i)
+			hash_set::insert(m, i*i);
+		for (s32 i = 0; i < 100; ++i)
+			ENSURE(hash_set::has(m, i*i));
+
+		hash_set::remove(m, 5*5);
+		ENSURE(!hash_set::has(m, 5*5));
+
+		hash_set::remove(m, 80*80);
+		ENSURE(!hash_set::has(m, 80*80));
+
+		hash_set::remove(m, 40*40);
+		ENSURE(!hash_set::has(m, 40*40));
+
+		hash_set::clear(m);
+
+		for (s32 i = 0; i < 100; ++i)
+			ENSURE(!hash_set::has(m, i*i));
 	}
 	memory_globals::shutdown();
 }
@@ -696,16 +732,14 @@ static void test_aabb()
 		ENSURE(fequal(c, 39.36f, 0.00001f));
 	}
 	{
-		AABB a;
-		aabb::reset(a);
-
 		const Vector3 points[] =
 		{
 			{ -1.2f,  3.4f,  5.5f },
 			{  8.2f, -2.4f, -1.5f },
 			{ -5.9f,  9.2f,  6.0f }
 		};
-		aabb::add_points(a, countof(points), points);
+		AABB a;
+		aabb::from_points(a, countof(points), points);
 		ENSURE(fequal(a.min.x, -5.9f, 0.00001f));
 		ENSURE(fequal(a.min.y, -2.4f, 0.00001f));
 		ENSURE(fequal(a.min.z, -1.5f, 0.00001f));
@@ -714,11 +748,6 @@ static void test_aabb()
 		ENSURE(fequal(a.max.z,  6.0f, 0.00001f));
 	}
 	{
-		AABB boxes[3];
-		aabb::reset(boxes[0]);
-		aabb::reset(boxes[1]);
-		aabb::reset(boxes[2]);
-
 		const Vector3 points[] =
 		{
 			{ -1.2f,  3.4f,  5.5f },
@@ -733,13 +762,13 @@ static void test_aabb()
 			{ -8.6f, -4.8f,  2.8f },
 			{  4.1f,  4.7f, -0.4f }
 		};
-		aabb::add_points(boxes[0], countof(points)/3, &points[0]);
-		aabb::add_points(boxes[1], countof(points)/3, &points[3]);
-		aabb::add_points(boxes[2], countof(points)/3, &points[6]);
+		AABB boxes[3];
+		aabb::from_points(boxes[0], countof(points)/3, &points[0]);
+		aabb::from_points(boxes[1], countof(points)/3, &points[3]);
+		aabb::from_points(boxes[2], countof(points)/3, &points[6]);
 
 		AABB d;
-		aabb::reset(d);
-		aabb::add_boxes(d, countof(boxes), boxes);
+		aabb::from_boxes(d, countof(boxes), boxes);
 		ENSURE(fequal(d.min.x, -8.6f, 0.00001f));
 		ENSURE(fequal(d.min.y, -4.8f, 0.00001f));
 		ENSURE(fequal(d.min.z, -2.2f, 0.00001f));
@@ -891,21 +920,21 @@ static void test_dynamic_string()
 	{
 		TempAllocator1024 ta;
 		DynamicString str(ta);
-		str.set("   \tSushi\t   ", 15);
+		str.set("   \tSushi\t   ", 13);
 		str.ltrim();
 		ENSURE(strcmp(str.c_str(), "Sushi\t   ") == 0);
 	}
 	{
 		TempAllocator1024 ta;
 		DynamicString str(ta);
-		str.set("   \tSushi\t   ", 15);
+		str.set("   \tSushi\t   ", 13);
 		str.rtrim();
 		ENSURE(strcmp(str.c_str(), "   \tSushi") == 0);
 	}
 	{
 		TempAllocator1024 ta;
 		DynamicString str(ta);
-		str.set("   \tSushi\t   ", 15);
+		str.set("   \tSushi\t   ", 13);
 		str.trim();
 		ENSURE(strcmp(str.c_str(), "Sushi") == 0);
 	}
@@ -1252,12 +1281,27 @@ static void test_command_line()
 	ENSURE(orange != NULL && strcmp(orange, "orange") == 0);
 }
 
+static void test_thread()
+{
+	Thread thread;
+	ENSURE(!thread.is_running());
+
+	thread.start([](void*) { return 0; }, NULL);
+	thread.stop();
+	ENSURE(thread.exit_code() == 0);
+
+	thread.start([](void*) { return -1; }, NULL);
+	thread.stop();
+	ENSURE(thread.exit_code() == -1);
+}
+
 int main_unit_tests()
 {
 	test_memory();
 	test_array();
 	test_vector();
 	test_hash_map();
+	test_hash_set();
 	test_vector2();
 	test_vector3();
 	test_vector4();
@@ -1275,6 +1319,7 @@ int main_unit_tests()
 	test_sjson();
 	test_path();
 	test_command_line();
+	test_thread();
 
 	return EXIT_SUCCESS;
 }

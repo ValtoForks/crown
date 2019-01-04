@@ -614,7 +614,7 @@ Mesh
 **mesh_obb** (rw, id) : Matrix4x4, Vector3
 	Returns the OBB of the mesh *id* as (pose, half_extents).
 
-**mesh_raycast** (rw, id, from, dir) : float
+**mesh_cast_ray** (rw, id, from, dir) : float
 	Returns the distance along ray (from, dir) to intersection point with the mesh *id* or -1.0 if no intersection.
 
 Sprite
@@ -650,7 +650,7 @@ Sprite
 **sprite_obb** (rw, unit) : Matrix4x4, Vector3
 	Returns the OBB of the sprite as (pose, half_extents).
 
-**sprite_raycast** (rw, unit, from, dir) : float, int, int
+**sprite_cast_ray** (rw, unit, from, dir) : float, int, int
 	Returns (t, layer, depth), where *t* is the distance along ray (from, dir) to
 	intersection point with the sprite or -1.0 if no intersection.
 
@@ -710,16 +710,27 @@ PhysicsWorld
 **set_gravity** (pw, gravity)
 	Sets the gravity.
 
-**raycast_closest** (pw, from, dir, length) : hit, collision_pos, normal, UnitId, Actor
-	Casts a ray into the physics world and returns the closest
-	actor it intersects with.
-	If *hit* is true the following return values contain
-	the *collision_pos* in world space, the *normal* of
-	the surface that was hit and the *unit* and the *actor* that was hit.
+**cast_ray** (pw, from, dir, length) : hit, collision_pos, normal, time, UnitId, Actor
+	Casts a ray into the physics world and returns the closest actor it intersects with.
+	If *hit* is true the following return values contain the *collision_pos* in
+	world space, the *normal* of the surface that was hit, the time of impact
+	in [0..1] and the *unit* and the *actor* that was hit.
 
-**raycast_all** (pw, from, dir, length) : table
+**cast_ray_all** (pw, from, dir, length) : table
 	Casts a ray into the physics world and returns all the
 	actors it intersects with as an array of `RaycastHit`_ tables.
+
+**cast_sphere** (pw, from, radius, dir, length) : hit, collision_pos, normal, time, UnitId, Actor
+	Casts a sphere into the physics world and returns the closest actor it intersects with.
+	If *hit* is true the following return values contain the *collision_pos* in
+	world space, the *normal* of the surface that was hit, the time of impact
+	in [0..1] and the *unit* and the *actor* that was hit.
+
+**cast_box** (pw, from, half_extents, dir, length) : hit, collision_pos, normal, time, UnitId, Actor
+	Casts a box into the physics world and returns the closest actor it intersects with.
+	If *hit* is true the following return values contain the *collision_pos* in
+	world space, the *normal* of the surface that was hit, the time of impact
+	in [0..1] and the *unit* and the *actor* that was hit.
 
 **enable_debug_drawing** (pw, enable)
 	Sets whether to *enable* debug drawing.
@@ -727,12 +738,13 @@ PhysicsWorld
 RaycastHit
 ----------
 
-RaycastHit is a lua table with 3 fields:
+RaycastHit is a lua table with 5 fields:
 
 * ``[1]``: The collision position in world space.
 * ``[2]``: The normal of the surface that was hit.
-* ``[3]``: The unit that was hit.
-* ``[4]``: The actor that was hit.
+* ``[3]``: The time of impact in [0..1].
+* ``[4]``: The unit that was hit.
+* ``[5]``: The actor that was hit.
 
 Actor
 -----
@@ -1299,6 +1311,9 @@ Window
 
 **minimize** ()
 	Minimizes the window.
+
+**maximize** ()
+	Maximizes the window.
 
 **restore** ()
 	Restores the window.

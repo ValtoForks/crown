@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -49,9 +49,9 @@
 	#undef CROWN_PLATFORM_WINDOWS
 // http://msdn.microsoft.com/en-us/library/6sehtctf.aspx
 	#if !defined(WINVER) && !defined(_WIN32_WINNT)
-// Windows Server 2003 with SP1, Windows XP with SP2 and above
-		#define WINVER 0x0502
-		#define _WIN32_WINNT 0x0502
+// Windows 7 and above
+		#define WINVER 0x0601
+		#define _WIN32_WINNT 0x0601
 	#endif // !defined(WINVER) && !defined(_WIN32_WINNT)
 	#define CROWN_PLATFORM_WINDOWS 1
 #elif defined(__ANDROID__)

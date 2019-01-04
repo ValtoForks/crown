@@ -1,11 +1,10 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #pragma once
 
-#include "core/platform.h"
 #include "core/strings/types.h"
 
 namespace crown

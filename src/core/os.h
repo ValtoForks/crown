@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -33,12 +33,6 @@ struct Stat
 /// @ingroup OS
 namespace os
 {
-	/// Returns the clock time.
-	s64 clocktime();
-
-	/// Returns che clock frequency.
-	s64 clockfrequency();
-
 	/// Suspends execution for @a ms milliseconds.
 	void sleep(u32 ms);
 

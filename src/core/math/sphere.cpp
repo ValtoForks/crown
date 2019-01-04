@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -18,7 +18,7 @@ namespace sphere
 		{
 			const Vector3& pi = *(const Vector3*)pts;
 
-			rr = fmax(rr, length_squared(pi - s.c));
+			rr = max(rr, length_squared(pi - s.c));
 		}
 
 		s.r = fsqrt(rr);

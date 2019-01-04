@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -78,10 +78,10 @@ namespace Crown
 			_vbox.pack_start(_filter_entry, false, true, 0);
 			_vbox.pack_start(_scrolled_window, true, true, 0);
 
-			add(_vbox);
+			this.add(_vbox);
 
-			set_size_request(300, 250);
-			show_all();
+			this.get_style_context().add_class("level-layers-view");
+			this.show_all();
 		}
 
 		private bool on_button_pressed(Gdk.EventButton ev)

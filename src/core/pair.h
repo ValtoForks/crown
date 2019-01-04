@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -30,6 +30,8 @@ struct Pair<T1, T2, 0, 0>
 	}
 
 	Pair(Allocator& /*a*/)
+		: first()
+		, second()
 	{
 	}
 };
@@ -50,6 +52,7 @@ struct Pair<T1, T2, 1, 0>
 
 	Pair(Allocator& a)
 		: first(a)
+		, second()
 	{
 	}
 };
@@ -69,7 +72,8 @@ struct Pair<T1, T2, 0, 1>
 	}
 
 	Pair(Allocator& a)
-		: second(a)
+		: first()
+		, second(a)
 	{
 	}
 };
@@ -101,36 +105,36 @@ template <typename T1, typename T2>
 inline void swap(Pair<T1, T2, 0, 0>& a, Pair<T1, T2, 0, 0>& b)
 {
 	char c[sizeof(a)];
-	memcpy( c, &a, sizeof(a));
-	memcpy(&a, &b, sizeof(a));
-	memcpy(&b, &c, sizeof(a));
+	memcpy((void*)&c, (void*)&a, sizeof(a));
+	memcpy((void*)&a, (void*)&b, sizeof(a));
+	memcpy((void*)&b, (void*)&c, sizeof(a));
 }
 
 template <typename T1, typename T2>
 inline void swap(Pair<T1, T2, 0, 1>& a, Pair<T1, T2, 0, 1>& b)
 {
 	char c[sizeof(a)];
-	memcpy( c, &a, sizeof(a));
-	memcpy(&a, &b, sizeof(a));
-	memcpy(&b, &c, sizeof(a));
+	memcpy((void*)&c, (void*)&a, sizeof(a));
+	memcpy((void*)&a, (void*)&b, sizeof(a));
+	memcpy((void*)&b, (void*)&c, sizeof(a));
 }
 
 template <typename T1, typename T2>
 inline void swap(Pair<T1, T2, 1, 0>& a, Pair<T1, T2, 1, 0>& b)
 {
 	char c[sizeof(a)];
-	memcpy( c, &a, sizeof(a));
-	memcpy(&a, &b, sizeof(a));
-	memcpy(&b, &c, sizeof(a));
+	memcpy((void*)&c, (void*)&a, sizeof(a));
+	memcpy((void*)&a, (void*)&b, sizeof(a));
+	memcpy((void*)&b, (void*)&c, sizeof(a));
 }
 
 template <typename T1, typename T2>
 inline void swap(Pair<T1, T2, 1, 1>& a, Pair<T1, T2, 1, 1>& b)
 {
 	char c[sizeof(a)];
-	memcpy( c, &a, sizeof(a));
-	memcpy(&a, &b, sizeof(a));
-	memcpy(&b, &c, sizeof(a));
+	memcpy((void*)&c, (void*)&a, sizeof(a));
+	memcpy((void*)&a, (void*)&b, sizeof(a));
+	memcpy((void*)&b, (void*)&c, sizeof(a));
 }
 
 } // namespace crown

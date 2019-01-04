@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -165,13 +165,12 @@ void Pipeline::render(ShaderManager& sm, StringId32 program, uint8_t view, uint1
 	bgfx::setViewRect(view, 0, 0, width, height);
 	bgfx::setViewTransform(view, NULL, ortho);
 
-	const uint32_t samplerFlags = 0
-		| BGFX_TEXTURE_RT
-		| BGFX_TEXTURE_MIN_POINT
-		| BGFX_TEXTURE_MAG_POINT
-		| BGFX_TEXTURE_MIP_POINT
-		| BGFX_TEXTURE_U_CLAMP
-		| BGFX_TEXTURE_V_CLAMP
+	const u32 samplerFlags = 0
+		| BGFX_SAMPLER_MIN_POINT
+		| BGFX_SAMPLER_MAG_POINT
+		| BGFX_SAMPLER_MIP_POINT
+		| BGFX_SAMPLER_U_CLAMP
+		| BGFX_SAMPLER_V_CLAMP
 		;
 	bgfx::setTexture(0, _tex_color, _buffers[0], samplerFlags);
 	screenSpaceQuad(width, height, 0.0f, caps->originBottomLeft);

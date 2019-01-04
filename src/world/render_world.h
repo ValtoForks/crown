@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -46,7 +46,7 @@ struct RenderWorld
 
 	/// Returns the distance along ray (from, dir) to intersection point with mesh @a i
 	/// or -1.0 if no intersection.
-	f32 mesh_raycast(MeshInstance i, const Vector3& from, const Vector3& dir);
+	f32 mesh_cast_ray(MeshInstance i, const Vector3& from, const Vector3& dir);
 
 	/// Creates a new sprite instance.
 	SpriteInstance sprite_create(UnitId id, const SpriteRendererDesc& srd, const Matrix4x4& tr);
@@ -83,7 +83,7 @@ struct RenderWorld
 
 	/// Returns the distance along ray (from, dir) to intersection point with sprite
 	/// or -1.0 if no intersection.
-	f32 sprite_raycast(UnitId unit, const Vector3& from, const Vector3& dir, u32& layer, u32& depth);
+	f32 sprite_cast_ray(UnitId unit, const Vector3& from, const Vector3& dir, u32& layer, u32& depth);
 
 	/// Creates a new light instance.
 	LightInstance light_create(UnitId unit, const LightDesc& ld, const Matrix4x4& tr);
@@ -212,7 +212,6 @@ struct RenderWorld
 			bool* flip_y;
 			u32* layer;
 			u32* depth;
-			SpriteInstance* next_instance;
 		};
 
 		Allocator* _allocator;
@@ -229,6 +228,7 @@ struct RenderWorld
 		SpriteInstance create(UnitId id, const SpriteResource* sr, StringId64 material, u32 layer, u32 depth, const Matrix4x4& tr);
 		void destroy(SpriteInstance i);
 		bool has(UnitId id);
+		void set_visible(SpriteInstance i, bool visible);
 		SpriteInstance sprite(UnitId id);
 		void allocate(u32 num);
 		void grow();

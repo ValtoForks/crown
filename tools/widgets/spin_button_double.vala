@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -48,6 +48,7 @@ namespace Crown
 
 			_x.value_changed.connect(on_value_changed);
 			_x.scroll_event.connect(on_scroll);
+			_x.set_width_chars(1);
 
 			add(_x);
 		}

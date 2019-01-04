@@ -1,5 +1,5 @@
 require "core/editors/level_editor/camera"
-require "core/editors/level_editor/class"
+require "core/lua/class"
 
 Colors = {
 	grid          = function() return Color4(102, 102, 102, 255) end,
@@ -9,10 +9,6 @@ Colors = {
 	axis_z        = function() return Color4(  0,   0, 217, 255) end,
 	axis_selected = function() return Color4(217, 217,   0, 255) end,
 }
-
-function log(msg)
-	Device.console_send { type = "message", message = msg, severity = "info" }
-end
 
 -- From Bitsquid's grid_plane.lua
 function snap_vector(tm, vector, size)
@@ -118,22 +114,24 @@ function raycast(objects, pos, dir)
 
 	for k, v in pairs(objects) do
 		local t, l, d = v:raycast(pos, dir)
-		if t ~= -1.0 then
-			-- If sprite
-			if l and d then
-				if l >= layer and d >= depth then
-					layer = l
-					depth = d
-					nearest = t
-					object = v
-				end
-			else
-				if t <= nearest then
-					nearest = t
-					object = v
-				end
+		if t == -1.0 then
+			goto continue
+		end
+		-- If sprite
+		if l and d then
+			if l >= layer and d >= depth then
+				layer = l
+				depth = d
+				nearest = t
+				object = v
+			end
+		else
+			if t <= nearest then
+				nearest = t
+				object = v
 			end
 		end
+		::continue::
 	end
 
 	return object, nearest
@@ -331,12 +329,12 @@ function UnitBox:raycast(pos, dir)
 	local rw = LevelEditor._rw
 	local mesh_component = RenderWorld.mesh_instances(rw, self._unit_id)
 	if mesh_component then
-		return RenderWorld.mesh_raycast(rw, mesh_component, pos, dir)
+		return RenderWorld.mesh_cast_ray(rw, mesh_component, pos, dir)
 	end
 
 	local sprite_component = RenderWorld.sprite_instances(rw, self._unit_id)
 	if sprite_component then
-		return RenderWorld.sprite_raycast(rw, self._unit_id, pos, dir)
+		return RenderWorld.sprite_cast_ray(rw, self._unit_id, pos, dir)
 	end
 
 	return -1.0
@@ -370,9 +368,10 @@ function UnitBox:set_light(type, range, intensity, angle, color)
 	RenderWorld.light_set_spot_angle(LevelEditor._rw, self._unit_id, angle)
 end
 
-function UnitBox:set_sprite(layer, depth)
+function UnitBox:set_sprite(layer, depth, visible)
 	RenderWorld.sprite_set_layer(LevelEditor._rw, self._unit_id, layer)
 	RenderWorld.sprite_set_depth(LevelEditor._rw, self._unit_id, depth)
+	RenderWorld.sprite_set_visible(LevelEditor._rw, self._unit_id, visible)
 end
 
 SoundObject = class(SoundObject)
@@ -463,7 +462,7 @@ function SoundObject:raycast(pos, dir)
 	local rw = LevelEditor._rw
 	local mesh_component = RenderWorld.mesh_instances(rw, self._unit_id)
 	local tm, hext = RenderWorld.mesh_obb(rw, mesh_component)
-	return RenderWorld.mesh_raycast(rw, mesh_component, pos, dir)
+	return RenderWorld.mesh_cast_ray(rw, mesh_component, pos, dir)
 end
 
 function SoundObject:draw()
@@ -1244,9 +1243,9 @@ function ScaleTool:mouse_move(x, y)
 
 			local selected = LevelEditor._selection:last_selected_object()
 			local pos = Vector3(1, 1, 1) + drag_vector
-			-- log(Vector3.to_string(self:drag_start()))
-			-- log(Vector3.to_string(pos))
-			-- log(Matrix4x4.to_string(selected:world_pose()) .. "\n")
+			-- print(Vector3.to_string(self:drag_start()))
+			-- print(Vector3.to_string(pos))
+			-- print(Matrix4x4.to_string(selected:world_pose()) .. "\n")
 			-- selected:set_local_scale(LevelEditor:snap(self:world_pose(), pos) or pos)
 	end
 end
@@ -1310,9 +1309,9 @@ function LevelEditor:init()
 	self._sg = World.scene_graph(self._world)
 	self._lines_no_depth = World.create_debug_line(self._world, false)
 	self._lines = World.create_debug_line(self._world, true)
-	self._fpscamera = FPSCamera(self._world, World.spawn_unit(self._world, "core/units/camera"))
-	self._mouse = { x = 0, y = 0, dx = 0, dy = 0, button = { left = false, middle = false, right = false }, wheel = { delta = 0 }}
-	self._keyboard = { ctrl = false, shift = false }
+	self._camera = Camera(self._world, World.spawn_unit(self._world, "core/units/camera"))
+	self._mouse = { x = 0, y = 0, x_last = 0, y_last = 0, button = { left = false, middle = false, right = false }, wheel = { delta = 0 }}
+	self._keyboard = { ctrl = false, shift = false, alt = false }
 	self._grid = { size = 1 }
 	self._rotation_snap = 15.0 * math.pi / 180.0
 	self._objects = {}
@@ -1333,8 +1332,8 @@ function LevelEditor:init()
 	-- Spawn camera
 	local pos = Vector3(20, 20, -20)
 	local dir = Vector3.normalize(Vector3.zero() - pos)
-	SceneGraph.set_local_rotation(self._sg, self._fpscamera:unit(), Quaternion.look(dir))
-	SceneGraph.set_local_position(self._sg, self._fpscamera:unit(), pos)
+	SceneGraph.set_local_rotation(self._sg, self._camera:unit(), Quaternion.look(dir))
+	SceneGraph.set_local_position(self._sg, self._camera:unit(), pos)
 end
 
 function LevelEditor:update(dt)
@@ -1347,14 +1346,13 @@ function LevelEditor:update(dt)
 		draw_world_origin_grid(self._lines, 10, self._grid.size)
 	end
 
-	local delta = Vector3.zero();
-	if self._mouse.right then
-		delta.x = self._mouse.dx;
-		delta.y = self._mouse.dy;
-	end
+	self._mouse.dx = self._mouse.x - self._mouse.x_last
+	self._mouse.dy = self._mouse.y - self._mouse.y_last
+	self._mouse.x_last = self._mouse.x
+	self._mouse.y_last = self._mouse.y
 
-	self._fpscamera:mouse_wheel(self._mouse.wheel.delta)
-	self._fpscamera:update(dt, -delta.x, -delta.y, self._keyboard)
+	self._camera:mouse_wheel(self._mouse.wheel.delta)
+	self._camera:update(dt, self._mouse.dx, self._mouse.dy, self._keyboard, self._mouse)
 
 	self.tool:update(dt, self._mouse.x, self._mouse.y)
 
@@ -1362,7 +1360,7 @@ function LevelEditor:update(dt)
 	self._mouse.dy = 0
 	self._mouse.wheel.delta = 0
 
-	local pos, dir = self._fpscamera:camera_ray(self._mouse.x, self._mouse.y)
+	local pos, dir = self._camera:camera_ray(self._mouse.x, self._mouse.y)
 	local selected_object, t = raycast(self._objects, pos, dir)
 	self._spawn_height = selected_object and (pos + dir * t).y or 0
 
@@ -1376,7 +1374,7 @@ function LevelEditor:update(dt)
 end
 
 function LevelEditor:render(dt)
-	Device.render(self._world, self._fpscamera:unit())
+	Device.render(self._world, self._camera:unit())
 end
 
 function LevelEditor:shutdown()
@@ -1398,11 +1396,9 @@ function LevelEditor:set_mouse_state(x, y, left, middle, right)
 	self._mouse.right = right
 end
 
-function LevelEditor:mouse_move(x, y, dx, dy)
+function LevelEditor:mouse_move(x, y)
 	self._mouse.x = x
 	self._mouse.y = y
-	self._mouse.dx = dx
-	self._mouse.dy = dy
 
 	self.tool:mouse_move(x, y)
 end
@@ -1424,8 +1420,9 @@ function LevelEditor:key_down(key)
 	if (key == "a") then self._keyboard.akey = true end
 	if (key == "s") then self._keyboard.skey = true end
 	if (key == "d") then self._keyboard.dkey = true end
-	if (key == "left_ctrl") then self._keyboard.ctrl = true end
-	if (key == "left_shift") then self._keyboard.shift = true end
+	if (key == "ctrl_left") then self._keyboard.ctrl = true end
+	if (key == "shift_left") then self._keyboard.shift = true end
+	if (key == "alt_left") then self._keyboard.alt = true end
 end
 
 function LevelEditor:key_up(key)
@@ -1433,12 +1430,13 @@ function LevelEditor:key_up(key)
 	if (key == "a") then self._keyboard.akey = false end
 	if (key == "s") then self._keyboard.skey = false end
 	if (key == "d") then self._keyboard.dkey = false end
-	if (key == "left_ctrl") then self._keyboard.ctrl = false end
-	if (key == "left_shift") then self._keyboard.shift = false end
+	if (key == "ctrl_left") then self._keyboard.ctrl = false end
+	if (key == "shift_left") then self._keyboard.shift = false end
+	if (key == "alt_left") then self._keyboard.alt = false end
 end
 
 function LevelEditor:camera()
-	return self._fpscamera
+	return self._camera
 end
 
 function LevelEditor:set_tool(tool)
@@ -1510,7 +1508,7 @@ function LevelEditor:snap(grid_tm, pos)
 end
 
 function LevelEditor:find_spawn_point(x, y)
-	local pos, dir = self._fpscamera:camera_ray(x, y)
+	local pos, dir = self._camera:camera_ray(x, y)
 	local spawn_height = LevelEditor._spawn_height
 	local point = Vector3(0, spawn_height, 0)
 	local normal = Vector3.up()
@@ -1592,29 +1590,29 @@ function LevelEditor:destroy(id)
 end
 
 function LevelEditor:camera_view_perspective()
-	self._fpscamera:set_perspective()
+	self._camera:set_perspective()
 end
 
 function LevelEditor:camera_view_front()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 0, 1), Vector3(0, 1, 0))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 0, 1), Vector3(0, 1, 0))
 end
 
 function LevelEditor:camera_view_back()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 0, -1), Vector3(0, 1, 0))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 0, -1), Vector3(0, 1, 0))
 end
 
 function LevelEditor:camera_view_right()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(-1, 0, 0), Vector3(0, 1, 0))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(-1, 0, 0), Vector3(0, 1, 0))
 end
 
 function LevelEditor:camera_view_left()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(1, 0, 0), Vector3(0, 1, 0))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(1, 0, 0), Vector3(0, 1, 0))
 end
 
 function LevelEditor:camera_view_top()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, -1, 0), Vector3(0, 0, 1))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, -1, 0), Vector3(0, 0, 1))
 end
 
 function LevelEditor:camera_view_bottom()
-	self._fpscamera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 1, 0), Vector3(0, 0, 1))
+	self._camera:set_orthographic(Vector3(0, 0, 0), Vector3(1, 1, 1), Vector3(0, 1, 0), Vector3(0, 0, 1))
 end

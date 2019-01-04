@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -15,10 +15,7 @@
 #include "resource/data_compiler.h"
 #include <bgfx/platform.h>
 #include <winsock2.h>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windowsx.h>
+#include <windowsx.h> // GET_X_LPARAM, GET_Y_LPARAM
 #include <xinput.h>
 
 namespace crown
@@ -328,13 +325,21 @@ struct WindowsDevice
 		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 		RegisterClassExA(&wnd);
 
+		DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
+		RECT rect;
+		rect.left   = 0;
+		rect.top    = 0;
+		rect.right  = opts->_window_width;
+		rect.bottom = opts->_window_height;
+		AdjustWindowRect(&rect, style, FALSE);
+
 		_hwnd = CreateWindowA("crown"
 			, "Crown"
-			, WS_OVERLAPPEDWINDOW | WS_VISIBLE
+			, style
 			, opts->_window_x
 			, opts->_window_y
-			, opts->_window_width
-			, opts->_window_height
+			, rect.right - rect.left
+			, rect.bottom - rect.top
 			, 0
 			, NULL
 			, instance
@@ -590,6 +595,11 @@ struct WindowWin : public Window
 		ShowWindow(_hwnd, SW_MINIMIZE);
 	}
 
+	void maximize()
+	{
+		ShowWindow(_hwnd, SW_MAXIMIZE);
+	}
+
 	void restore()
 	{
 		ShowWindow(_hwnd, SW_RESTORE);
@@ -699,17 +709,23 @@ int main(int argc, char** argv)
 		return main_unit_tests();
 	}
 #endif // CROWN_BUILD_UNIT_TESTS
-	if (cl.has_option("compile") || cl.has_option("server"))
-	{
-		if (main_data_compiler(argc, argv) != EXIT_SUCCESS || !cl.has_option("continue"))
-			return EXIT_FAILURE;
-	}
 
 	InitMemoryGlobals m;
 	CE_UNUSED(m);
 
 	DeviceOptions opts(default_allocator(), argc, (const char**)argv);
-	int ec = opts.parse();
+	bool quit = false;
+	int ec = opts.parse(&quit);
+
+	if (quit)
+		return ec;
+
+	if (ec == EXIT_SUCCESS && (opts._do_compile || opts._server))
+	{
+		ec = main_data_compiler(opts);
+		if (!opts._do_continue)
+			return ec;
+	}
 
 	if (ec == EXIT_SUCCESS)
 		ec = s_wdvc.run(&opts);

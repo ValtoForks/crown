@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -11,9 +11,7 @@ namespace Crown
 	/// Manages objects in a level.
 	public class Level
 	{
-		// Project paths
-		public string _source_dir;
-		public string _toolchain_dir;
+		public Project _project;
 
 		// Engine connections
 		public ConsoleClient _client;
@@ -31,11 +29,9 @@ namespace Crown
 		public signal void selection_changed(Gee.ArrayList<Guid?> selection);
 		public signal void object_editor_name_changed(Guid object_id, string name);
 
-		public Level(Database db, ConsoleClient client, string source_dir, string toolchain_dir)
+		public Level(Database db, ConsoleClient client, Project project)
 		{
-			// Project paths
-			_source_dir = source_dir;
-			_toolchain_dir = toolchain_dir;
+			_project = project;
 
 			// Engine connections
 			_client = client;
@@ -81,7 +77,7 @@ namespace Crown
 		/// Loads the empty level template.
 		public void load_empty_level()
 		{
-			load(_toolchain_dir + "/" + "core/editors/levels/empty.level");
+			load(_project.toolchain_dir() + "/" + "core/editors/levels/empty.level");
 		}
 
 		public void spawn_unit(Guid id, string name, Vector3 pos, Quaternion rot, Vector3 scl)
@@ -315,7 +311,7 @@ namespace Crown
 			unit.set_component_property_bool  (component_id, "data.visible", visible);
 			unit.set_component_property_string(component_id, "type", "sprite_renderer");
 
-			_client.send_script(LevelEditorApi.set_sprite(unit_id, layer, depth));
+			_client.send_script(LevelEditorApi.set_sprite(unit_id, layer, depth, visible));
 		}
 
 		public void set_sound(Guid sound_id, string name, double range, double volume, bool loop)
@@ -433,11 +429,11 @@ namespace Crown
 
 			Database prefab_db = new Database();
 
-			File file = File.new_for_path(_toolchain_dir + "/" + name + ".unit");
+			File file = File.new_for_path(_project.toolchain_dir() + "/" + name + ".unit");
 			if (file.query_exists())
 				prefab_db.load(file.get_path());
 			else
-				prefab_db.load(_source_dir + "/" + name + ".unit");
+				prefab_db.load(_project.source_dir() + "/" + name + ".unit");
 
 			if (prefab_db.has_property(GUID_ZERO, "prefab"))
 				load_prefab((prefab_db.get_property_string(GUID_ZERO, "prefab")));
@@ -668,6 +664,7 @@ namespace Crown
 					_client.send_script(LevelEditorApi.set_sprite(unit_id
 						, unit.get_component_property_double(component_id, "data.layer")
 						, unit.get_component_property_double(component_id, "data.depth")
+						, unit.get_component_property_bool  (component_id, "data.visible")
 						));
 					// FIXME: Hack to force update the properties view
 					selection_changed(_selection);

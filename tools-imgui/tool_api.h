@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -120,25 +120,23 @@ void mouse_wheel(StringStream& out, f32 delta)
 	out << delta << ")";
 }
 
-void mouse_move(StringStream& out, f32 x, f32 y, f32 dx, f32 dy)
+void mouse_move(StringStream& out, f32 x, f32 y)
 {
 	out << "LevelEditor:mouse_move(";
 	out << x << ",";
-	out << y << ",";
-	out << dx << ",";
-	out << dy << ")";
+	out << y << ")";
 }
 
-void keyboard_pressed(StringStream& out, char c)
+void key_down(StringStream& out, const char* key)
 {
 	out << "LevelEditor:key_down(";
-	out << "\\\"" << c << "\\\"" << ")";
+	out << "\\\"" << key << "\\\"" << ")";
 }
 
-void keyboard_released(StringStream& out, char c)
+void key_up(StringStream& out, const char* key)
 {
 	out << "LevelEditor:key_up(";
-	out << "\\\"" << c << "\\\"" << ")";
+	out << "\\\"" << key << "\\\"" << ")";
 }
 
 void set_grid_size(StringStream& out, f32 size)

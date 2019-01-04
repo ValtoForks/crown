@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -44,7 +44,7 @@ struct DeviceOptions
 
 	/// Parses the command line and returns
 	/// EXIT_SUCCESS if no error is found.
-	int parse();
+	int parse(bool* quit);
 };
 
 } // namespace crown

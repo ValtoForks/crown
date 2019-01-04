@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #include "core/error/error.h"
 #include "core/network/ip_address.h"
 #include "core/network/socket.h"
+#include "core/platform.h"
 
 #if CROWN_PLATFORM_POSIX
 	#include <errno.h>
@@ -13,6 +14,7 @@
 	#include <netinet/in.h> // htons, htonl, ...
 	#include <sys/socket.h>
 	#include <unistd.h>     // close
+	typedef int SOCKET;
 	#define INVALID_SOCKET (-1)
 	#define SOCKET_ERROR (-1)
 	#define closesocket close
@@ -20,6 +22,8 @@
 	#define WSAECONNREFUSED ECONNREFUSED
 	#define WSAETIMEDOUT ETIMEDOUT
 	#define WSAEWOULDBLOCK EWOULDBLOCK
+#elif CROWN_PLATFORM_WINDOWS
+	#include <winsock2.h>
 #endif // CROWN_PLATFORM_POSIX
 
 namespace crown
@@ -36,6 +40,11 @@ namespace
 	}
 
 }
+
+struct Private
+{
+	SOCKET socket;
+};
 
 namespace socket_internal
 {
@@ -62,7 +71,8 @@ namespace socket_internal
 		}
 		else
 		{
-			c._socket = err;
+			Private* priv = (Private*)c._data;
+			priv->socket = (SOCKET)err;
 		}
 
 		return ar;
@@ -145,33 +155,73 @@ namespace socket_internal
 		return wr;
 	}
 
+	void set_blocking(SOCKET socket, bool blocking)
+	{
+#if CROWN_PLATFORM_POSIX
+		int flags = fcntl(socket, F_GETFL, 0);
+		fcntl(socket, F_SETFL, blocking ? (flags & ~O_NONBLOCK) : O_NONBLOCK);
+#elif CROWN_PLATFORM_WINDOWS
+		u_long non_blocking = blocking ? 0 : 1;
+		int err = ioctlsocket(socket, FIONBIO, &non_blocking);
+		CE_ASSERT(err == 0, "ioctlsocket: last_error() = %d", last_error());
+		CE_UNUSED(err);
+#endif
+	}
+
+	void set_reuse_address(SOCKET socket, bool reuse)
+	{
+		int optval = (int)reuse;
+		int err = setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&optval, sizeof(optval));
+		CE_ASSERT(err == 0, "setsockopt: last_error() = %d", last_error());
+		CE_UNUSED(err);
+	}
+
+	void set_timeout(SOCKET socket, u32 ms)
+	{
+		struct timeval tv;
+		tv.tv_sec  = ms / 1000;
+		tv.tv_usec = ms % 1000 * 1000;
+
+		int err = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+		CE_ASSERT(err == 0, "setsockopt: last_error(): %d", last_error());
+		err = setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
+		CE_ASSERT(err == 0, "setsockopt: last_error(): %d", last_error());
+		CE_UNUSED(err);
+	}
+
 } // namespace socket_internal
 
 TCPSocket::TCPSocket()
-	: _socket(INVALID_SOCKET)
 {
+	CE_STATIC_ASSERT(sizeof(_data) >= sizeof(SOCKET));
+	Private* priv = (Private*)_data;
+	priv->socket = INVALID_SOCKET;
 }
 
 void TCPSocket::close()
 {
-	if (_socket != INVALID_SOCKET)
+	Private* priv = (Private*)_data;
+
+	if (priv->socket != INVALID_SOCKET)
 	{
-		::closesocket(_socket);
-		_socket = INVALID_SOCKET;
+		::closesocket(priv->socket);
+		priv->socket = INVALID_SOCKET;
 	}
 }
 
 ConnectResult TCPSocket::connect(const IPAddress& ip, u16 port)
 {
+	Private* priv = (Private*)_data;
+
 	close();
-	_socket = socket_internal::open();
+	priv->socket = socket_internal::open();
 
 	sockaddr_in addr_in;
 	addr_in.sin_family = AF_INET;
 	addr_in.sin_addr.s_addr = htonl(ip.address());
 	addr_in.sin_port = htons(port);
 
-	int err = ::connect(_socket, (const sockaddr*)&addr_in, sizeof(sockaddr_in));
+	int err = ::connect(priv->socket, (const sockaddr*)&addr_in, sizeof(sockaddr_in));
 
 	ConnectResult cr;
 	cr.error = ConnectResult::SUCCESS;
@@ -191,16 +241,18 @@ ConnectResult TCPSocket::connect(const IPAddress& ip, u16 port)
 
 BindResult TCPSocket::bind(u16 port)
 {
+	Private* priv = (Private*)_data;
+
 	close();
-	_socket = socket_internal::open();
-	set_reuse_address(true);
+	priv->socket = socket_internal::open();
+	socket_internal::set_reuse_address(priv->socket, true);
 
 	sockaddr_in address;
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
 	address.sin_port = htons(port);
 
-	int err = ::bind(_socket, (const sockaddr*)&address, sizeof(sockaddr_in));
+	int err = ::bind(priv->socket, (const sockaddr*)&address, sizeof(sockaddr_in));
 
 	BindResult br;
 	br.error = BindResult::SUCCESS;
@@ -218,79 +270,59 @@ BindResult TCPSocket::bind(u16 port)
 
 void TCPSocket::listen(u32 max)
 {
-	int err = ::listen(_socket, max);
+	Private* priv = (Private*)_data;
+
+	int err = ::listen(priv->socket, max);
 	CE_ASSERT(err == 0, "listen: last_error() = %d", last_error());
 	CE_UNUSED(err);
 }
 
 AcceptResult TCPSocket::accept(TCPSocket& c)
 {
-	set_blocking(true);
-	return socket_internal::accept(_socket, c);
+	Private* priv = (Private*)_data;
+
+	socket_internal::set_blocking(priv->socket, true);
+	return socket_internal::accept(priv->socket, c);
 }
 
 AcceptResult TCPSocket::accept_nonblock(TCPSocket& c)
 {
-	set_blocking(false);
-	return socket_internal::accept(_socket, c);
+	Private* priv = (Private*)_data;
+
+	socket_internal::set_blocking(priv->socket, false);
+	return socket_internal::accept(priv->socket, c);
 }
 
 ReadResult TCPSocket::read(void* data, u32 size)
 {
-	set_blocking(true);
-	return socket_internal::read(_socket, data, size);
+	Private* priv = (Private*)_data;
+
+	socket_internal::set_blocking(priv->socket, true);
+	return socket_internal::read(priv->socket, data, size);
 }
 
 ReadResult TCPSocket::read_nonblock(void* data, u32 size)
 {
-	set_blocking(false);
-	return socket_internal::read(_socket, data, size);
+	Private* priv = (Private*)_data;
+
+	socket_internal::set_blocking(priv->socket, false);
+	return socket_internal::read(priv->socket, data, size);
 }
 
 WriteResult TCPSocket::write(const void* data, u32 size)
 {
-	set_blocking(true);
-	return socket_internal::write(_socket, data, size);
+	Private* priv = (Private*)_data;
+
+	socket_internal::set_blocking(priv->socket, true);
+	return socket_internal::write(priv->socket, data, size);
 }
 
 WriteResult TCPSocket::write_nonblock(const void* data, u32 size)
 {
-	set_blocking(false);
-	return socket_internal::write(_socket, data, size);
-}
+	Private* priv = (Private*)_data;
 
-void TCPSocket::set_blocking(bool blocking)
-{
-#if CROWN_PLATFORM_POSIX
-	int flags = fcntl(_socket, F_GETFL, 0);
-	fcntl(_socket, F_SETFL, blocking ? (flags & ~O_NONBLOCK) : O_NONBLOCK);
-#elif CROWN_PLATFORM_WINDOWS
-	u_long non_blocking = blocking ? 0 : 1;
-	int err = ioctlsocket(_socket, FIONBIO, &non_blocking);
-	CE_ASSERT(err == 0, "ioctlsocket: last_error() = %d", last_error());
-	CE_UNUSED(err);
-#endif
-}
-
-void TCPSocket::set_reuse_address(bool reuse)
-{
-	int optval = (int)reuse;
-	int err = setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&optval, sizeof(optval));
-	CE_ASSERT(err == 0, "setsockopt: last_error() = %d", last_error());
-	CE_UNUSED(err);
-}
-
-void TCPSocket::set_timeout(u32 seconds)
-{
-	struct timeval timeout;
-	timeout.tv_sec = seconds;
-	timeout.tv_usec = 0;
-
-	int err = setsockopt(_socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
-	CE_ASSERT(err == 0, "setsockopt: last_error(): %d", last_error());
-	err = setsockopt(_socket, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
-	CE_ASSERT(err == 0, "setsockopt: last_error(): %d", last_error());
-	CE_UNUSED(err);
+	socket_internal::set_blocking(priv->socket, false);
+	return socket_internal::write(priv->socket, data, size);
 }
 
 } // namespace crown

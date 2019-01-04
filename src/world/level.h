@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -24,6 +24,7 @@ struct Level
 	World* _world;
 	const LevelResource* _resource;
 	Array<UnitId> _unit_lookup;
+	ListNode _node;
 
 	///
 	Level(Allocator& a, UnitManager& um, World& w, const LevelResource& lr);

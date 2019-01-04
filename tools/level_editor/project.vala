@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -37,12 +37,154 @@ namespace Crown
 			_map = new HashMap<string, Guid?>();
 		}
 
+		public void reset()
+		{
+			_files.reset();
+			_map.clear();
+		}
+
 		public void load(string source_dir, string toolchain_dir)
 		{
+			reset();
 			_source_dir        = File.new_for_path(source_dir);
 			_toolchain_dir     = File.new_for_path(toolchain_dir);
 			_data_dir          = File.new_for_path(_source_dir.get_path() + "_" + _platform);
 			_level_editor_test = File.new_for_path(_source_dir.get_path() + "/" + "_level_editor_test.level");
+		}
+
+		public void create_initial_files()
+		{
+			// Write boot.config
+			{
+				string text = """// Lua script to launch on boot
+boot_script = "core/game/boot"
+
+// Package to load on boot
+boot_package = "boot"
+
+window_title = "New Poject"
+
+// Linux-only configs
+linux = {
+	renderer = {
+		resolution = [ 1280 720 ]
+	}
+}
+
+// Windows-only configs
+windows = {
+	renderer = {
+		resolution = [ 1280 720 ]
+	}
+}
+""";
+				string path = Path.build_filename(_source_dir.get_path(), "boot.config");
+				FileStream fs = FileStream.open(path, "w");
+				GLib.assert(fs != null);
+				fs.write(text.data);
+			}
+
+			// Write boot.package
+			{
+				string text = """lua = [
+	"core/game/boot"
+	"core/game/camera"
+	"core/game/game"
+	"core/lua/class"
+	"main"
+]
+shader = [
+	"core/shaders/common"
+	"core/shaders/default"
+]
+physics_config = [
+	"global"
+]
+""";
+				string path = Path.build_filename(_source_dir.get_path(), "boot.package");
+				FileStream fs = FileStream.open(path, "w");
+				GLib.assert(fs != null);
+				fs.write(text.data);
+			}
+
+			// Write global.physics_config
+			{
+				string text = """materials = {
+	default = { friction = 0.8 rolling_friction = 0.5 restitution = 0.81 }
+}
+
+collision_filters = {
+	no_collision = { collides_with = [] }
+	default = { collides_with = [ "default" ] }
+}
+
+actors = {
+	static = { dynamic = false }
+	dynamic = { dynamic = true }
+	keyframed = { dynamic = true kinematic = true disable_gravity = true }
+}
+""";
+				string path = Path.build_filename(_source_dir.get_path(), "global.physics_config");
+				FileStream fs = FileStream.open(path, "w");
+				GLib.assert(fs != null);
+				fs.write(text.data);
+			}
+
+			// Write main.lua
+			{
+				string text = """require "core/game/camera"
+
+Game = Game or {}
+
+Game = {
+	sg = nil,
+	pw = nil,
+	rw = nil,
+	camera = nil,
+}
+
+GameBase.game = Game
+GameBase.game_level = nil
+
+function Game.level_loaded()
+	Device.enable_resource_autoload(true)
+
+	Game.sg = World.scene_graph(GameBase.world)
+	Game.pw = World.physics_world(GameBase.world)
+	Game.rw = World.render_world(GameBase.world)
+
+	-- Spawn camera
+	local camera_unit = World.spawn_unit(GameBase.world, "core/units/camera")
+	SceneGraph.set_local_position(Game.sg, camera_unit, Vector3(0, 6.5, -30))
+	GameBase.game_camera = camera_unit
+	Game.camera = FPSCamera(GameBase.world, camera_unit)
+end
+
+function Game.update(dt)
+	-- Stop the engine when the 'ESC' key is released
+	if Keyboard.released(Keyboard.button_id("escape")) then
+		Device.quit()
+	end
+
+	-- Update camera
+	local delta = Vector3.zero()
+	if Mouse.pressed(Mouse.button_id("right")) then move = true end
+	if Mouse.released(Mouse.button_id("right")) then move = false end
+	if move then delta = Mouse.axis(Mouse.axis_id("cursor_delta")) end
+	Game.camera:update(dt, delta.x, delta.y)
+end
+
+function Game.render(dt)
+end
+
+function Game.shutdown()
+end
+""";
+				string path = Path.build_filename(_source_dir.get_path(), "main.lua");
+				FileStream fs = FileStream.open(path, "w");
+				GLib.assert(fs != null);
+				fs.write(text.data);
+			}
 		}
 
 		public string source_dir()
@@ -124,13 +266,37 @@ namespace Crown
 
 		public void import_sprites(SList<string> filenames, string destination_dir)
 		{
+			Hashtable importer_settings = null;
+			string importer_settings_path = null;
+			{
+				GLib.File file_src = File.new_for_path(filenames.nth_data(0));
+				GLib.File file_dst = File.new_for_path(destination_dir + "/" + file_src.get_basename());
+
+				string resource_filename = _source_dir.get_relative_path(file_dst);
+				string resource_name     = resource_filename.substring(0, resource_filename.last_index_of_char('.'));
+
+				importer_settings_path = Path.build_filename(_source_dir.get_path(), resource_name) + ".importer_settings";
+			}
+
 			SpriteImportDialog sid = new SpriteImportDialog(filenames.nth_data(0));
+
+			if (File.new_for_path(importer_settings_path).query_exists())
+			{
+				importer_settings = SJSON.load(importer_settings_path);
+				sid.load(importer_settings);
+			}
+			else
+			{
+				importer_settings = new Hashtable();
+			}
 
 			if (sid.run() != Gtk.ResponseType.OK)
 			{
 				sid.destroy();
 				return;
 			}
+
+			sid.save(importer_settings);
 
 			int width     = (int)sid._pixbuf.width;
 			int height    = (int)sid._pixbuf.height;
@@ -147,6 +313,12 @@ namespace Crown
 
 			Vector2 pivot_xy = sprite_cell_pivot_xy(cell_w, cell_h, sid.pivot.active);
 
+			bool collision_enabled = sid.collision_enabled.active;
+			int collision_x = (int)sid.collision_x.value;
+			int collision_y = (int)sid.collision_y.value;
+			int collision_w = (int)sid.collision_w.value;
+			int collision_h = (int)sid.collision_h.value;
+
 			sid.destroy();
 
 			foreach (unowned string filename_i in filenames)
@@ -159,6 +331,8 @@ namespace Crown
 
 				string resource_filename = _source_dir.get_relative_path(file_dst);
 				string resource_name     = resource_filename.substring(0, resource_filename.last_index_of_char('.'));
+
+				SJSON.save(importer_settings, Path.build_filename(_source_dir.get_path(), resource_name) + ".importer_settings");
 
 				Hashtable textures = new Hashtable();
 				textures["u_albedo"] = resource_name;
@@ -225,14 +399,13 @@ namespace Crown
 
 				SJSON.save(sprite, Path.build_filename(_source_dir.get_path(), resource_name) + ".sprite");
 
-				// Generate .unit
-				string unit_name = Path.build_filename(_source_dir.get_path(), resource_name) + ".unit";
-				File unit_file = File.new_for_path(unit_name);
 
+				// Generate .unit
 				Database db = new Database();
 
 				// Do not overwrite existing .unit
-				if (unit_file.query_exists())
+				string unit_name = Path.build_filename(_source_dir.get_path(), resource_name) + ".unit";
+				if (File.new_for_path(unit_name).query_exists())
 					db.load(unit_name);
 
 				Unit unit = new Unit(db, GUID_ZERO, null);
@@ -284,6 +457,161 @@ namespace Crown
 						unit.set_component_property_double(id, "data.depth", depth);
 						unit.set_component_property_bool  (id, "data.visible", true);
 						unit.set_component_property_string(id, "type", "sprite_renderer");
+					}
+				}
+
+				if (collision_enabled)
+				{
+					// Create collider (geometry)
+					{
+						// d-----a
+						// |     |
+						// |     |
+						// c-----b
+						Vector2 a = {};
+						Vector2 b = {};
+						Vector2 c = {};
+						Vector2 d = {};
+
+						double PIXELS_PER_METER = 32.0;
+
+						a.x = (collision_w + collision_x - pivot_xy.x) / PIXELS_PER_METER;
+						a.y = (              collision_y - pivot_xy.y) / PIXELS_PER_METER;
+
+						b.x = (collision_w + collision_x - pivot_xy.x) / PIXELS_PER_METER;
+						b.y = (collision_h + collision_y - pivot_xy.y) / PIXELS_PER_METER;
+
+						c.x = (              collision_x - pivot_xy.x) / PIXELS_PER_METER;
+						c.y = (collision_h + collision_y - pivot_xy.y) / PIXELS_PER_METER;
+
+						d.x = (              collision_x - pivot_xy.x) / PIXELS_PER_METER;
+						d.y = (              collision_y - pivot_xy.y) / PIXELS_PER_METER;
+
+						// Invert Y axis
+						a.y = a.y == 0.0f ? a.y : -a.y;
+						b.y = b.y == 0.0f ? b.y : -b.y;
+						c.y = c.y == 0.0f ? c.y : -c.y;
+						d.y = d.y == 0.0f ? d.y : -d.y;
+
+						ArrayList<Value?> position = new ArrayList<Value?>();
+						// Up face
+						position.add(a.x); position.add( 0.25); position.add(a.y);
+						position.add(b.x); position.add( 0.25); position.add(b.y);
+						position.add(c.x); position.add( 0.25); position.add(c.y);
+						position.add(d.x); position.add( 0.25); position.add(d.y);
+						// Bottom face
+						position.add(a.x); position.add(-0.25); position.add(a.y);
+						position.add(b.x); position.add(-0.25); position.add(b.y);
+						position.add(c.x); position.add(-0.25); position.add(c.y);
+						position.add(d.x); position.add(-0.25); position.add(d.y);
+
+						ArrayList<Value?> indices_data = new ArrayList<Value?>();
+						indices_data.add(0); indices_data.add(2); indices_data.add(3);
+						indices_data.add(7); indices_data.add(5); indices_data.add(4);
+						indices_data.add(4); indices_data.add(1); indices_data.add(0);
+						indices_data.add(5); indices_data.add(2); indices_data.add(1);
+						indices_data.add(6); indices_data.add(3); indices_data.add(2);
+						indices_data.add(0); indices_data.add(7); indices_data.add(4);
+						indices_data.add(0); indices_data.add(1); indices_data.add(2);
+						indices_data.add(7); indices_data.add(6); indices_data.add(5);
+						indices_data.add(4); indices_data.add(5); indices_data.add(1);
+						indices_data.add(5); indices_data.add(6); indices_data.add(2);
+						indices_data.add(6); indices_data.add(7); indices_data.add(3);
+						indices_data.add(0); indices_data.add(3); indices_data.add(7);
+
+						ArrayList<Value?> data = new ArrayList<Value?>();
+						data.add(indices_data);
+
+						Hashtable indices = new Hashtable();
+						indices["size"] = indices_data.size;
+						indices["data"] = data;
+
+						Hashtable geometries_collider = new Hashtable();
+						geometries_collider["position"] = position;
+						geometries_collider["indices"] = indices;
+
+						Hashtable geometries = new Hashtable();
+						geometries["collider"] = geometries_collider;
+
+						ArrayList<Value?> matrix_local = new ArrayList<Value?>();
+						matrix_local.add(1.0); matrix_local.add(0.0); matrix_local.add(0.0); matrix_local.add(0.0);
+						matrix_local.add(0.0); matrix_local.add(1.0); matrix_local.add(0.0); matrix_local.add(0.0);
+						matrix_local.add(0.0); matrix_local.add(0.0); matrix_local.add(1.0); matrix_local.add(0.0);
+						matrix_local.add(0.0); matrix_local.add(0.0); matrix_local.add(0.0); matrix_local.add(1.0);
+
+						Hashtable nodes_collider = new Hashtable();
+						nodes_collider["matrix_local"] = matrix_local;
+
+						Hashtable nodes = new Hashtable();
+						nodes["collider"] = nodes_collider;
+
+						Hashtable mesh = new Hashtable();
+						mesh["geometries"] = geometries;
+						mesh["nodes"] = nodes;
+
+						SJSON.save(mesh, Path.build_filename(_source_dir.get_path(), resource_name) + ".mesh");
+					}
+
+					// Create collider
+					{
+						Guid id = Guid.new_guid();
+
+						if (!unit.has_component("collider", ref id))
+						{
+							db.create(id);
+							db.set_property_string(id, "data.shape", "box");
+							db.set_property_string(id, "data.scene", resource_name);
+							db.set_property_string(id, "data.name", "collider");
+							db.set_property_string(id, "data.material", "default");
+							db.set_property_string(id, "type", "collider");
+
+							db.add_to_set(GUID_ZERO, "components", id);
+						}
+						else
+						{
+							unit.set_component_property_string(id, "data.shape", "box");
+							unit.set_component_property_string(id, "data.scene", resource_name);
+							unit.set_component_property_string(id, "data.name", "collider");
+							unit.set_component_property_string(id, "data.material", "default");
+							unit.set_component_property_string(id, "type", "collider");
+						}
+					}
+
+					// Create actor
+					{
+						Guid id = Guid.new_guid();
+
+						if (!unit.has_component("actor", ref id))
+						{
+							db.create(id);
+							db.set_property_string(id, "data.class", "static");
+							db.set_property_string(id, "data.collision_filter", "default");
+							db.set_property_bool  (id, "data.lock_rotation_x", true);
+							db.set_property_bool  (id, "data.lock_rotation_y", true);
+							db.set_property_bool  (id, "data.lock_rotation_z", true);
+							db.set_property_bool  (id, "data.lock_translation_x", false);
+							db.set_property_bool  (id, "data.lock_translation_y", true);
+							db.set_property_bool  (id, "data.lock_translation_z", false);
+							db.set_property_double(id, "data.mass", 10);
+							db.set_property_string(id, "data.material", "default");
+							db.set_property_string(id, "type", "actor");
+
+							db.add_to_set(GUID_ZERO, "components", id);
+						}
+						else
+						{
+							unit.set_component_property_string(id, "data.class", "static");
+							unit.set_component_property_string(id, "data.collision_filter", "default");
+							unit.set_component_property_bool  (id, "data.lock_rotation_x", true);
+							unit.set_component_property_bool  (id, "data.lock_rotation_y", true);
+							unit.set_component_property_bool  (id, "data.lock_rotation_z", true);
+							unit.set_component_property_bool  (id, "data.lock_translation_x", false);
+							unit.set_component_property_bool  (id, "data.lock_translation_y", true);
+							unit.set_component_property_bool  (id, "data.lock_translation_z", false);
+							unit.set_component_property_double(id, "data.mass", 10);
+							unit.set_component_property_string(id, "data.material", "default");
+							unit.set_component_property_string(id, "type", "actor");
+						}
 					}
 				}
 
@@ -346,13 +674,11 @@ namespace Crown
 				}
 
 				// Generate .unit
-				string unit_name = Path.build_filename(_source_dir.get_path(), resource_name) + ".unit";
-				File unit_file = File.new_for_path(unit_name);
-
 				Database db = new Database();
 
 				// Do not overwrite existing .unit
-				if (unit_file.query_exists())
+				string unit_name = Path.build_filename(_source_dir.get_path(), resource_name) + ".unit";
+				if (File.new_for_path(unit_name).query_exists())
 					db.load(unit_name);
 
 				Unit unit = new Unit(db, GUID_ZERO, null);
@@ -387,10 +713,10 @@ namespace Crown
 						unit.remove_component(id);
 				}
 
+				Hashtable mesh = SJSON.load(filename_i);
+				Hashtable mesh_nodes = (Hashtable)mesh["nodes"];
 				// Create mesh_renderer
 				{
-					Hashtable mesh = SJSON.load(filename_i);
-					Hashtable mesh_nodes = (Hashtable)mesh["nodes"];
 					foreach (var entry in mesh_nodes.entries)
 					{
 						string node_name = (string)entry.key;
@@ -404,6 +730,56 @@ namespace Crown
 						db.set_property_string(id, "type", "mesh_renderer");
 
 						db.add_to_set(GUID_ZERO, "components", id);
+					}
+				}
+
+				// Create collider
+				{
+					Guid id = Guid.new_guid();
+
+					if (!unit.has_component("collider", ref id))
+					{
+						db.create(id);
+						db.set_property_string(id, "data.shape", "mesh");
+						db.set_property_string(id, "data.scene", resource_name);
+						db.set_property_string(id, "data.name", mesh_nodes.entries.to_array()[0].key);
+						db.set_property_string(id, "data.material", "default");
+						db.set_property_string(id, "type", "collider");
+
+						db.add_to_set(GUID_ZERO, "components", id);
+					}
+					else
+					{
+						unit.set_component_property_string(id, "data.shape", "mesh");
+						unit.set_component_property_string(id, "data.scene", resource_name);
+						unit.set_component_property_string(id, "data.name", mesh_nodes.entries.to_array()[0].key);
+						unit.set_component_property_string(id, "data.material", "default");
+						unit.set_component_property_string(id, "type", "collider");
+					}
+				}
+
+				// Create actor
+				{
+					Guid id = Guid.new_guid();
+
+					if (!unit.has_component("actor", ref id))
+					{
+						db.create(id);
+						db.set_property_string(id, "data.class", "static");
+						db.set_property_string(id, "data.collision_filter", "default");
+						db.set_property_double(id, "data.mass", 10);
+						db.set_property_string(id, "data.material", "default");
+						db.set_property_string(id, "type", "actor");
+
+						db.add_to_set(GUID_ZERO, "components", id);
+					}
+					else
+					{
+						unit.set_component_property_string(id, "data.class", "static");
+						unit.set_component_property_string(id, "data.collision_filter", "default");
+						unit.set_component_property_double(id, "data.mass", 10);
+						unit.set_component_property_string(id, "data.material", "default");
+						unit.set_component_property_string(id, "type", "actor");
 					}
 				}
 

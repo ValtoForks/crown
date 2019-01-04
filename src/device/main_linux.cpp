@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -310,16 +310,27 @@ s32 func(void* data)
 struct LinuxDevice
 {
 	::Display* _x11_display;
-	Atom _wm_delete_message;
-	XRRScreenConfiguration* _screen_config;
+	Atom _wm_delete_window;
+	Atom _net_wm_state;
+	Atom _net_wm_state_maximized_horz;
+	Atom _net_wm_state_maximized_vert;
+	Atom _net_wm_state_fullscreen;
+	Cursor _x11_hidden_cursor;
 	bool _x11_detectable_autorepeat;
+	XRRScreenConfiguration* _screen_config;
 	DeviceEventQueue _queue;
 	Joypad _joypad;
 
 	LinuxDevice()
 		: _x11_display(NULL)
-		, _screen_config(NULL)
+		, _wm_delete_window(None)
+		, _net_wm_state(None)
+		, _net_wm_state_maximized_horz(None)
+		, _net_wm_state_maximized_vert(None)
+		, _net_wm_state_fullscreen(None)
+		, _x11_hidden_cursor(None)
 		, _x11_detectable_autorepeat(false)
+		, _screen_config(NULL)
 	{
 	}
 
@@ -339,7 +350,11 @@ struct LinuxDevice
 		Bool detectable;
 		_x11_detectable_autorepeat = (bool)XkbSetDetectableAutoRepeat(_x11_display, true, &detectable);
 
-		_wm_delete_message = XInternAtom(_x11_display, "WM_DELETE_WINDOW", False);
+		_wm_delete_window = XInternAtom(_x11_display, "WM_DELETE_WINDOW", False);
+		_net_wm_state = XInternAtom(_x11_display, "_NET_WM_STATE", False);
+		_net_wm_state_maximized_horz = XInternAtom(_x11_display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+		_net_wm_state_maximized_vert = XInternAtom(_x11_display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+		_net_wm_state_fullscreen = XInternAtom(_x11_display, "_NET_WM_STATE_FULLSCREEN", False);
 
 		// Save screen configuration
 		_screen_config = XRRGetScreenInfo(_x11_display, root_window);
@@ -362,6 +377,13 @@ struct LinuxDevice
 			, NULL
 			);
 		CE_ASSERT(ic != NULL, "XCreateIC: error");
+
+		// Build hidden cursor
+		Pixmap bitmap;
+		const char data[8] = { 0 };
+		XColor dummy;
+		bitmap = XCreateBitmapFromData(_x11_display, root_window, data, 8, 8);
+		_x11_hidden_cursor = XCreatePixmapCursor(_x11_display, bitmap, bitmap, &dummy, &dummy, 0, 0);
 
 		// Start main thread
 		MainThreadArgs mta;
@@ -399,7 +421,7 @@ struct LinuxDevice
 					break;
 
 				case ClientMessage:
-					if ((Atom)event.xclient.data.l[0] == _wm_delete_message)
+					if ((Atom)event.xclient.data.l[0] == _wm_delete_window)
 						_queue.push_exit_event();
 					break;
 
@@ -503,6 +525,9 @@ struct LinuxDevice
 
 		main_thread.stop();
 
+		XFreeCursor(_x11_display, _x11_hidden_cursor);
+		XFreePixmap(_x11_display, bitmap);
+
 		XDestroyIC(ic);
 		XCloseIM(im);
 
@@ -532,12 +557,9 @@ static LinuxDevice s_ldvc;
 struct WindowX11 : public Window
 {
 	::Window _x11_window;
-	Cursor _x11_hidden_cursor;
-	Atom _wm_delete_message;
 
 	WindowX11()
 		: _x11_window(None)
-		, _x11_hidden_cursor(None)
 	{
 	}
 
@@ -591,19 +613,7 @@ struct WindowX11 : public Window
 			);
 		CE_ASSERT(_x11_window != None, "XCreateWindow: error");
 
-		// Build hidden cursor
-		Pixmap bm_no;
-		XColor black, dummy;
-		Colormap colormap;
-		static char no_data[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-
-		colormap = XDefaultColormap(s_ldvc._x11_display, screen);
-		XAllocNamedColor(s_ldvc._x11_display, colormap, "black", &black, &dummy);
-		bm_no = XCreateBitmapFromData(s_ldvc._x11_display, _x11_window, no_data, 8, 8);
-		_x11_hidden_cursor = XCreatePixmapCursor(s_ldvc._x11_display, bm_no, bm_no, &black, &black, 0, 0);
-
-		_wm_delete_message = XInternAtom(s_ldvc._x11_display, "WM_DELETE_WINDOW", False);
-		XSetWMProtocols(s_ldvc._x11_display, _x11_window, &_wm_delete_message, 1);
+		XSetWMProtocols(s_ldvc._x11_display, _x11_window, &s_ldvc._wm_delete_window, 1);
 
 		XMapRaised(s_ldvc._x11_display, _x11_window);
 	}
@@ -644,12 +654,32 @@ struct WindowX11 : public Window
 		XMoveWindow(s_ldvc._x11_display, _x11_window, x, y);
 	}
 
+	void maximize_or_restore(bool maximize)
+	{
+		XEvent xev;
+		xev.type = ClientMessage;
+		xev.xclient.window = _x11_window;
+		xev.xclient.message_type = s_ldvc._net_wm_state;
+		xev.xclient.format = 32;
+		xev.xclient.data.l[0] = maximize ? 1 : 0; // 0 = remove property, 1 = set property
+		xev.xclient.data.l[1] = s_ldvc._net_wm_state_maximized_horz;
+		xev.xclient.data.l[2] = s_ldvc._net_wm_state_maximized_vert;
+		XSendEvent(s_ldvc._x11_display, DefaultRootWindow(s_ldvc._x11_display), False, SubstructureNotifyMask | SubstructureRedirectMask, &xev);
+	}
+
 	void minimize()
 	{
+		XIconifyWindow(s_ldvc._x11_display, _x11_window, DefaultScreen(s_ldvc._x11_display));
+	}
+
+	void maximize()
+	{
+		maximize_or_restore(true);
 	}
 
 	void restore()
 	{
+		maximize_or_restore(false);
 	}
 
 	const char* title()
@@ -658,7 +688,7 @@ struct WindowX11 : public Window
 		memset(buf, 0, sizeof(buf));
 		char* name;
 		XFetchName(s_ldvc._x11_display, _x11_window, &name);
-		strncpy(buf, name, sizeof(buf));
+		strncpy(buf, name, sizeof(buf)-1);
 		XFree(name);
 		return buf;
 	}
@@ -677,20 +707,20 @@ struct WindowX11 : public Window
 	{
 		XDefineCursor(s_ldvc._x11_display
 			, _x11_window
-			, show ? None : _x11_hidden_cursor
+			, show ? None : s_ldvc._x11_hidden_cursor
 			);
 	}
 
 	void set_fullscreen(bool full)
 	{
-		XEvent e;
-		e.xclient.type = ClientMessage;
-		e.xclient.window = _x11_window;
-		e.xclient.message_type = XInternAtom(s_ldvc._x11_display, "_NET_WM_STATE", False);
-		e.xclient.format = 32;
-		e.xclient.data.l[0] = full ? 1 : 0;
-		e.xclient.data.l[1] = XInternAtom(s_ldvc._x11_display, "_NET_WM_STATE_FULLSCREEN", False);
-		XSendEvent(s_ldvc._x11_display, DefaultRootWindow(s_ldvc._x11_display), False, SubstructureNotifyMask, &e);
+		XEvent xev;
+		xev.xclient.type = ClientMessage;
+		xev.xclient.window = _x11_window;
+		xev.xclient.message_type = s_ldvc._net_wm_state;
+		xev.xclient.format = 32;
+		xev.xclient.data.l[0] = full ? 1 : 0;
+		xev.xclient.data.l[1] = s_ldvc._net_wm_state_fullscreen;
+		XSendEvent(s_ldvc._x11_display, DefaultRootWindow(s_ldvc._x11_display), False, SubstructureNotifyMask | SubstructureRedirectMask, &xev);
 	}
 };
 
@@ -790,17 +820,23 @@ int main(int argc, char** argv)
 		return main_unit_tests();
 	}
 #endif // CROWN_BUILD_UNIT_TESTS
-	if (cl.has_option("compile") || cl.has_option("server"))
-	{
-		if (main_data_compiler(argc, argv) != EXIT_SUCCESS || !cl.has_option("continue"))
-			return EXIT_FAILURE;
-	}
 
 	InitMemoryGlobals m;
 	CE_UNUSED(m);
 
 	DeviceOptions opts(default_allocator(), argc, (const char**)argv);
-	int ec = opts.parse();
+	bool quit = false;
+	int ec = opts.parse(&quit);
+
+	if (quit)
+		return ec;
+
+	if (ec == EXIT_SUCCESS && (opts._do_compile || opts._server))
+	{
+		ec = main_data_compiler(opts);
+		if (!opts._do_continue)
+			return ec;
+	}
 
 	if (ec == EXIT_SUCCESS)
 		ec = s_ldvc.run(&opts);

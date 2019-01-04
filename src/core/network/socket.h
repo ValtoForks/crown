@@ -1,19 +1,12 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #pragma once
 
 #include "core/network/types.h"
-#include "core/platform.h"
 #include "core/types.h"
-
-#if CROWN_PLATFORM_POSIX
-	typedef int SOCKET;
-#elif CROWN_PLATFORM_WINDOWS
-	#include <winsock2.h>
-#endif
 
 namespace crown
 {
@@ -79,8 +72,9 @@ struct WriteResult
 /// @ingroup Network
 struct TCPSocket
 {
-	SOCKET _socket;
+	CE_ALIGN_DECL(16, u8 _data[8]);
 
+	///
 	TCPSocket();
 
 	/// Closes the socket.
@@ -112,15 +106,6 @@ struct TCPSocket
 
 	/// Writes @a size bytes and returns the result.
 	WriteResult write_nonblock(const void* data, u32 size);
-
-	/// Sets whether the socket is @a blocking.
-	void set_blocking(bool blocking);
-
-	/// Sets whether the socket should @a reuse a busy port.
-	void set_reuse_address(bool reuse);
-
-	/// Sets the timeout to the given @a seconds.
-	void set_timeout(u32 seconds);
 };
 
 } // namespace crown

@@ -1,22 +1,11 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #pragma once
 
-#include "core/error/error.h"
-#include "core/platform.h"
 #include "core/types.h"
-
-#if CROWN_PLATFORM_POSIX
-	#include <pthread.h>
-#elif CROWN_PLATFORM_WINDOWS
-	#ifndef WIN32_LEAN_AND_MEAN
-	#define WIN32_LEAN_AND_MEAN
-	#endif
-	#include <windows.h>
-#endif
 
 namespace crown
 {
@@ -25,15 +14,18 @@ namespace crown
 /// @ingroup Thread
 struct Mutex
 {
-#if CROWN_PLATFORM_POSIX
-	pthread_mutex_t _mutex;
-#elif CROWN_PLATFORM_WINDOWS
-	CRITICAL_SECTION _cs;
-#endif
+	CE_ALIGN_DECL(16, u8 _data[64]);
 
+	///
 	Mutex();
+
+	///
 	~Mutex();
+
+	///
 	Mutex(const Mutex&) = delete;
+
+	///
 	Mutex& operator=(const Mutex&) = delete;
 
 	/// Locks the mutex.
@@ -41,6 +33,9 @@ struct Mutex
 
 	/// Unlocks the mutex.
 	void unlock();
+
+	/// Returns the native mutex handle.
+	void* native_handle();
 };
 
 /// Automatically locks a mutex when created and unlocks when destroyed.
@@ -63,7 +58,10 @@ struct ScopedMutex
 		_mutex.unlock();
 	}
 
+	///
 	ScopedMutex(const ScopedMutex&) = delete;
+
+	///
 	ScopedMutex& operator=(const ScopedMutex&) = delete;
 };
 

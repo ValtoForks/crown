@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <limits.h> // NAME_MAX
 #include <sys/inotify.h>
+#include <sys/select.h>
 #include <unistd.h> // read
 
 namespace crown

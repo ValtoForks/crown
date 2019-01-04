@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -1898,11 +1898,11 @@ static int render_world_mesh_obb(lua_State* L)
 	return 2;
 }
 
-static int render_world_mesh_raycast(lua_State* L)
+static int render_world_mesh_cast_ray(lua_State* L)
 {
 	LuaStack stack(L);
 	RenderWorld* rw = stack.get_render_world(1);
-	float t = rw->mesh_raycast(stack.get_mesh_instance(2)
+	float t = rw->mesh_cast_ray(stack.get_mesh_instance(2)
 		, stack.get_vector3(3)
 		, stack.get_vector3(4)
 		);
@@ -2006,13 +2006,13 @@ static int render_world_sprite_obb(lua_State* L)
 	return 2;
 }
 
-static int render_world_sprite_raycast(lua_State* L)
+static int render_world_sprite_cast_ray(lua_State* L)
 {
 	LuaStack stack(L);
 	RenderWorld* rw = stack.get_render_world(1);
 	u32 layer;
 	u32 depth;
-	float t = rw->sprite_raycast(stack.get_unit(2)
+	float t = rw->sprite_cast_ray(stack.get_unit(2)
 		, stack.get_vector3(3)
 		, stack.get_vector3(4)
 		, layer
@@ -2422,79 +2422,124 @@ static int physics_world_set_gravity(lua_State* L)
 	return 0;
 }
 
-static int physics_world_raycast_closest(lua_State* L)
+static int physics_world_cast_ray(lua_State* L)
 {
 	LuaStack stack(L);
-	PhysicsWorld* world = stack.get_physics_world(1);
 
-	TempAllocator1024 ta;
-	Array<RaycastHit> hits(ta);
-
-	world->raycast(stack.get_vector3(2)
+	RaycastHit hit;
+	if (stack.get_physics_world(1)->cast_ray(hit
+		, stack.get_vector3(2)
 		, stack.get_vector3(3)
 		, stack.get_float(4)
-		, RaycastMode::CLOSEST
-		, hits
-		);
-
-	if (array::size(hits))
+		))
 	{
 		stack.push_bool(true);
-		stack.push_vector3(hits[0].position);
-		stack.push_vector3(hits[0].normal);
-		stack.push_unit(hits[0].unit);
-		stack.push_actor(hits[0].actor);
-		return 5;
+		stack.push_vector3(hit.position);
+		stack.push_vector3(hit.normal);
+		stack.push_float(hit.time);
+		stack.push_unit(hit.unit);
+		stack.push_actor(hit.actor);
+		return 6;
 	}
-	else
-	{
-		stack.push_bool(false);
-		return 1;
-	}
+
+	stack.push_bool(false);
+	return 1;
 }
 
-static int physics_world_raycast_all(lua_State* L)
+static int physics_world_cast_ray_all(lua_State* L)
 {
 	LuaStack stack(L);
-	PhysicsWorld* world = stack.get_physics_world(1);
 
 	TempAllocator1024 ta;
 	Array<RaycastHit> hits(ta);
-
-	world->raycast(stack.get_vector3(2)
+	if (stack.get_physics_world(1)->cast_ray_all(hits
+		, stack.get_vector3(2)
 		, stack.get_vector3(3)
 		, stack.get_float(4)
-		, RaycastMode::ALL
-		, hits
-		);
-
-	const u32 num_hits = array::size(hits);
-
-	stack.push_table(num_hits);
-	for (u32 i = 0; i < num_hits; ++i)
+		))
 	{
-		stack.push_key_begin(i+1);
-		stack.push_table();
+		const u32 num_hits = array::size(hits);
+
+		stack.push_table(num_hits);
+		for (u32 i = 0; i < num_hits; ++i)
 		{
-			stack.push_key_begin(1);
-			stack.push_vector3(hits[i].position);
-			stack.push_key_end();
+			stack.push_key_begin(i+1);
+			stack.push_table();
+			{
+				stack.push_key_begin(1);
+				stack.push_vector3(hits[i].position);
+				stack.push_key_end();
 
-			stack.push_key_begin(2);
-			stack.push_vector3(hits[i].normal);
-			stack.push_key_end();
+				stack.push_key_begin(2);
+				stack.push_vector3(hits[i].normal);
+				stack.push_key_end();
 
-			stack.push_key_begin(3);
-			stack.push_unit(hits[i].unit);
-			stack.push_key_end();
+				stack.push_key_begin(3);
+				stack.push_float(hits[i].time);
+				stack.push_key_end();
 
-			stack.push_key_begin(4);
-			stack.push_actor(hits[i].actor);
+				stack.push_key_begin(4);
+				stack.push_unit(hits[i].unit);
+				stack.push_key_end();
+
+				stack.push_key_begin(5);
+				stack.push_actor(hits[i].actor);
+				stack.push_key_end();
+			}
 			stack.push_key_end();
 		}
-		stack.push_key_end();
 	}
 
+	return 1;
+}
+
+static int physics_world_cast_sphere(lua_State* L)
+{
+	LuaStack stack(L);
+
+	RaycastHit hit;
+	if (stack.get_physics_world(1)->cast_sphere(hit
+		, stack.get_vector3(2)
+		, stack.get_float(3)
+		, stack.get_vector3(4)
+		, stack.get_float(5)
+		))
+	{
+		stack.push_bool(true);
+		stack.push_vector3(hit.position);
+		stack.push_vector3(hit.normal);
+		stack.push_float(hit.time);
+		stack.push_unit(hit.unit);
+		stack.push_actor(hit.actor);
+		return 6;
+	}
+
+	stack.push_bool(false);
+	return 1;
+}
+
+static int physics_world_cast_box(lua_State* L)
+{
+	LuaStack stack(L);
+
+	RaycastHit hit;
+	if (stack.get_physics_world(1)->cast_box(hit
+		, stack.get_vector3(2)
+		, stack.get_vector3(3)
+		, stack.get_vector3(4)
+		, stack.get_float(5)
+		))
+	{
+		stack.push_bool(true);
+		stack.push_vector3(hit.position);
+		stack.push_vector3(hit.normal);
+		stack.push_float(hit.time);
+		stack.push_unit(hit.unit);
+		stack.push_actor(hit.actor);
+		return 6;
+	}
+
+	stack.push_bool(false);
 	return 1;
 }
 
@@ -3202,6 +3247,12 @@ static int window_minimize(lua_State* /*L*/)
 	return 0;
 }
 
+static int window_maximize(lua_State* /*L*/)
+{
+	device()->_window->maximize();
+	return 0;
+}
+
 static int window_restore(lua_State* /*L*/)
 {
 	device()->_window->restore();
@@ -3534,7 +3585,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("RenderWorld", "mesh_destroy",         render_world_mesh_destroy);
 	env.add_module_function("RenderWorld", "mesh_instances",       render_world_mesh_instances);
 	env.add_module_function("RenderWorld", "mesh_obb",             render_world_mesh_obb);
-	env.add_module_function("RenderWorld", "mesh_raycast",         render_world_mesh_raycast);
+	env.add_module_function("RenderWorld", "mesh_cast_ray",        render_world_mesh_cast_ray);
 	env.add_module_function("RenderWorld", "mesh_set_visible",     render_world_mesh_set_visible);
 	env.add_module_function("RenderWorld", "sprite_create",        render_world_sprite_create);
 	env.add_module_function("RenderWorld", "sprite_destroy",       render_world_sprite_destroy);
@@ -3546,7 +3597,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("RenderWorld", "sprite_set_layer",     render_world_sprite_set_layer);
 	env.add_module_function("RenderWorld", "sprite_set_depth",     render_world_sprite_set_depth);
 	env.add_module_function("RenderWorld", "sprite_obb",           render_world_sprite_obb);
-	env.add_module_function("RenderWorld", "sprite_raycast",       render_world_sprite_raycast);
+	env.add_module_function("RenderWorld", "sprite_cast_ray",      render_world_sprite_cast_ray);
 	env.add_module_function("RenderWorld", "light_create",         render_world_light_create);
 	env.add_module_function("RenderWorld", "light_destroy",        render_world_light_destroy);
 	env.add_module_function("RenderWorld", "light_instances",      render_world_light_instances);
@@ -3599,8 +3650,10 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("PhysicsWorld", "joint_create",                  physics_world_joint_create);
 	env.add_module_function("PhysicsWorld", "gravity",                       physics_world_gravity);
 	env.add_module_function("PhysicsWorld", "set_gravity",                   physics_world_set_gravity);
-	env.add_module_function("PhysicsWorld", "raycast_closest",               physics_world_raycast_closest);
-	env.add_module_function("PhysicsWorld", "raycast_all",                   physics_world_raycast_all);
+	env.add_module_function("PhysicsWorld", "cast_ray",                      physics_world_cast_ray);
+	env.add_module_function("PhysicsWorld", "cast_ray_all",                  physics_world_cast_ray_all);
+	env.add_module_function("PhysicsWorld", "cast_sphere",                   physics_world_cast_sphere);
+	env.add_module_function("PhysicsWorld", "cast_box",                      physics_world_cast_box);
 	env.add_module_function("PhysicsWorld", "enable_debug_drawing",          physics_world_enable_debug_drawing);
 	env.add_module_metafunction("PhysicsWorld", "__tostring", physics_world_tostring);
 
@@ -3675,6 +3728,7 @@ void load_api(LuaEnvironment& env)
 	env.add_module_function("Window", "resize",      window_resize);
 	env.add_module_function("Window", "move",        window_move);
 	env.add_module_function("Window", "minimize",    window_minimize);
+	env.add_module_function("Window", "maximize",    window_maximize);
 	env.add_module_function("Window", "restore",     window_restore);
 	env.add_module_function("Window", "title",       window_title);
 	env.add_module_function("Window", "set_title",   window_set_title);

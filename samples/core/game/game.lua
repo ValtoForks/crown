@@ -21,19 +21,13 @@ function GameBase.init()
 	-- Craete default camera
 	local camera_unit = World.spawn_unit(GameBase.world, "core/units/camera")
 	local scene_graph = World.scene_graph(GameBase.world)
-	SceneGraph.set_local_position(scene_graph
-		, camera_unit
-		, Vector3(0, 6.5, -30)
-		)
+	SceneGraph.set_local_position(scene_graph, camera_unit, Vector3(0, 6.5, -30))
 	GameBase.camera = FPSCamera(GameBase.world, camera_unit)
 
-	local level = nil
-
-	if TEST then
-		level = "_level_editor_test"
+	local level = TEST and "_level_editor_test" or GameBase.game_level
+	if level then
+		World.load_level(GameBase.world, level)
 	end
-
-	World.load_level(GameBase.world, level or GameBase.game_level)
 
 	if GameBase.game and GameBase.game.level_loaded then
 		GameBase.game.level_loaded()
@@ -56,7 +50,7 @@ function GameBase.update(dt)
 		if Mouse.pressed(Mouse.button_id("right")) then move = true end
 		if Mouse.released(Mouse.button_id("right")) then move = false end
 		if move then delta = Mouse.axis(Mouse.axis_id("cursor_delta")) end
-		GameBase.camera:update(-delta.x, -delta.y)
+		GameBase.camera:update(dt, delta.x, delta.y)
 	end
 
 	if GameBase.game and GameBase.game.update then

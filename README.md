@@ -1,4 +1,4 @@
-The flexible game engine. [![Build Status](https://travis-ci.org/dbartolini/crown.svg?branch=master)](https://travis-ci.org/dbartolini/crown) [![Build status](https://ci.appveyor.com/api/projects/status/tt8et3tbj6tx8c31?svg=true)](https://ci.appveyor.com/project/dbartolini/crown) [![Join the chat at https://gitter.im/crown-engine/Lobby](https://badges.gitter.im/crown-engine/Lobby.svg)](https://gitter.im/crown-engine/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+The flexible game engine. [![Build Status](https://travis-ci.org/dbartolini/crown.svg?branch=master)](https://travis-ci.org/dbartolini/crown) [![Build status](https://ci.appveyor.com/api/projects/status/tt8et3tbj6tx8c31?svg=true)](https://ci.appveyor.com/project/dbartolini/crown)
 =====================================
 
 Crown is a general purpose data-driven game engine, written from scratch in [orthodox C++](https://gist.github.com/bkaradzic/2e39896bc7d8c34e042b) with a minimalistic and data-oriented design philosophy in mind.
@@ -24,7 +24,7 @@ Engine initialization and shutdown.
 ## Download
 
 ### Linux
-[crown-0.0.31-linux-x64.tar.gz](https://github.com/dbartolini/crown/releases/download/v0.0.31/crown-0.0.31-linux-x64.tar.gz)
+[crown-0.1.0-linux-x64.tar.gz](https://github.com/dbartolini/crown/releases/download/v0.1.0/crown-0.1.0-linux-x64.tar.gz)
 
 ## Documentation
 
@@ -78,7 +78,7 @@ Michela Iacchelli - Pepper logo.
 License
 -------
 
-	Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+	Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
 
 	Permission is hereby granted, free of charge, to any person
 	obtaining a copy of this software and associated documentation

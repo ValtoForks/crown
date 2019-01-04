@@ -1,23 +1,12 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #pragma once
 
-#include "core/platform.h"
 #include "core/thread/semaphore.h"
 #include "core/types.h"
-
-#if CROWN_PLATFORM_POSIX
-	#include <pthread.h>
-#elif CROWN_PLATFORM_WINDOWS
-	#ifndef WIN32_LEAN_AND_MEAN
-	#define WIN32_LEAN_AND_MEAN
-	#endif
-	#include <windows.h>
-	#include <process.h>
-#endif
 
 /// @defgroup Thread Thread
 /// @ingroup Core
@@ -34,15 +23,19 @@ struct Thread
 	void* _user_data;
 	Semaphore _sem;
 	bool _is_running;
-#if CROWN_PLATFORM_POSIX
-	pthread_t _handle;
-#elif CROWN_PLATFORM_WINDOWS
-	HANDLE _handle;
-#endif
+	s32 _exit_code;
+	CE_ALIGN_DECL(16, u8 _data[32]);
 
+	///
 	Thread();
+
+	///
 	~Thread();
+
+	///
 	Thread(const Thread&) = delete;
+
+	///
 	Thread& operator=(const Thread&) = delete;
 
 	///
@@ -54,8 +47,8 @@ struct Thread
 	///
 	bool is_running();
 
-	/// Do not call explicitly.
-	s32 run();
+	///
+	s32 exit_code();
 };
 
 } // namespace crown

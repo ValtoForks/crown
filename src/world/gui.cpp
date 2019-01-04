@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -27,6 +27,8 @@ Gui::Gui(GuiBuffer& gb, ResourceManager& rm, ShaderManager& sm, MaterialManager&
 	, _material_manager(&mm)
 	, _world(MATRIX4X4_IDENTITY)
 {
+	_node.next = NULL;
+	_node.prev = NULL;
 }
 
 Gui::~Gui()

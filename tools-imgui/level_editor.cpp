@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -77,7 +77,7 @@ Vector2 sprite_cell_xy(int r, int c, int offset_x, int offset_y, int cell_w, int
 {
 	int x0 = offset_x + c*cell_w + c*spacing_x;
 	int y0 = offset_y + r*cell_h + r*spacing_y;
-	return vector2(x0, y0);
+	return vector2((f32)x0, (f32)y0);
 }
 
 Vector2 sprite_cell_pivot_xy(int cell_w, int cell_h, int pivot)
@@ -137,7 +137,7 @@ Vector2 sprite_cell_pivot_xy(int cell_w, int cell_h, int pivot)
 		break;
 	}
 
-	return vector2(pivot_x, pivot_y);
+	return vector2((f32)pivot_x, (f32)pivot_y);
 }
 
 struct SpriteImporter
@@ -229,7 +229,6 @@ struct SpriteImporter
 			}
 
 			ImGui::InvisibleButton("canvas", canvas_size);
-			ImVec2 mouse_pos_in_canvas = ImVec2(ImGui::GetIO().MousePos.x - canvas_pos.x, ImGui::GetIO().MousePos.y - canvas_pos.y);
 			draw_list->PushClipRect(canvas_pos, ImVec2(canvas_pos.x+canvas_size.x, canvas_pos.y+canvas_size.y));      // clip lines within the canvas (if we resize it, etc.)
 		}
 #endif
@@ -238,38 +237,37 @@ struct SpriteImporter
 		ImGui::BeginGroup();
 		ImGui::LabelText("Resolution", "%d x %d", width, height);
 
-		// FIXME: replace fclamp
 		ImGui::InputInt("Cells H", &cells_h);
-		cells_h = (int)fclamp(cells_h, 1, 256);
+		cells_h = clamp(cells_h, 1, 256);
 
 		ImGui::InputInt("Cells V", &cells_v);
-		cells_v = (int)fclamp(cells_v, 1, 256);
+		cells_v = clamp(cells_v, 1, 256);
 
 		ImGui::Checkbox("Cell WH auto", &cell_wh_auto);
 		ImGui::InputInt("Cell W", &cell_w);
-		cell_w = (int)fclamp(cell_w, 1, 4096);
+		cell_w = clamp(cell_w, 1, 4096);
 
 		ImGui::InputInt("Cell H", &cell_h);
-		cell_h = (int)fclamp(cell_h, 1, 4096);
+		cell_h = clamp(cell_h, 1, 4096);
 
 		ImGui::InputInt("Offset X", &offset_x);
-		offset_x = (int)fclamp(offset_x, 0, 128);
+		offset_x = clamp(offset_x, 0, 128);
 
 		ImGui::InputInt("Offset Y", &offset_y);
-		offset_y = (int)fclamp(offset_y, 0, 128);
+		offset_y = clamp(offset_y, 0, 128);
 
 		ImGui::InputInt("Spacing X", &spacing_x);
-		spacing_x = (int)fclamp(spacing_x, 0, 128);
+		spacing_x = clamp(spacing_x, 0, 128);
 
 		ImGui::InputInt("Spacing Y", &spacing_y);
-		spacing_y = (int)fclamp(spacing_y, 0, 128);
+		spacing_y = clamp(spacing_y, 0, 128);
 
 		ImGui::Combo("Pivot", &pivot, pivot_names, Pivot::COUNT);
 		ImGui::InputInt("Layer", &layer);
-		layer = (int)fclamp(layer, 0, 7);
+		layer = clamp(layer, 0, 7);
 
 		ImGui::InputInt("Depth", &depth);
-		depth = (int)fclamp(depth, 0, 9999);
+		depth = clamp(depth, 0, 9999);
 
 		ImGui::EndGroup();
 	}
@@ -315,9 +313,9 @@ struct Inspector
 
 		if (ImGui::TreeNodeEx("Transform", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::InputFloat3("Position", _position, ImGuiInputTextFlags_CharsDecimal);
-			ImGui::InputFloat3("Rotation", _rotation, ImGuiInputTextFlags_CharsDecimal);
-			ImGui::InputFloat3("Scale", _scale, ImGuiInputTextFlags_CharsDecimal);
+			ImGui::InputFloat3("Position", _position);
+			ImGui::InputFloat3("Rotation", _rotation);
+			ImGui::InputFloat3("Scale", _scale);
 
 			ImGui::TreePop();
 		}
@@ -341,10 +339,9 @@ struct Inspector
 //-----------------------------------------------------------------------------
 struct SceneView
 {
-	ImVec2 _view_origin;
-	ImVec2 _view_size;
-	ImVec2 _mouse_curr;
-	ImVec2 _mouse_last;
+	ImVec2 _origin;
+	ImVec2 _size;
+	ImVec2 _cursor;
 	bool _open;
 
 	SceneView()
@@ -357,7 +354,7 @@ struct SceneView
 		if (!_open)
 			return;
 
-		_view_origin = ImGui::GetCursorScreenPos();
+		_origin = ImGui::GetCursorScreenPos();
 
 		uint16_t w, h;
 		device()->resolution(w, h);
@@ -374,8 +371,8 @@ struct SceneView
 #endif // CROWN_PLATFORM_WINDOWS
 		);
 
-		ImVec2 mouse_pos_in_view = ImVec2(ImGui::GetIO().MousePos.x - _view_origin.x
-			, ImGui::GetIO().MousePos.y - _view_origin.y
+		ImVec2 mouse_pos_in_view = ImVec2(ImGui::GetIO().MousePos.x - _origin.x
+			, ImGui::GetIO().MousePos.y - _origin.y
 			);
 
 		if (ImGui::IsWindowHovered()
@@ -396,8 +393,8 @@ struct SceneView
 			ImGui::CaptureKeyboardFromApp(true);
 		}
 
-		_view_size = ImGui::GetWindowSize();
-		_view_size.x -= _view_origin.x;
+		_size = ImGui::GetWindowSize();
+		_size.x -= _origin.x;
 	}
 };
 
@@ -561,8 +558,8 @@ struct SpriteAnimator
 		CE_ENSURE(NULL != path);
 
 		const char* ls = strrchr(path, '/');
-		u32 file_len = strlen(ls+1);
-		u32 dir_len = strlen(path) - file_len;
+		u32 file_len = strlen32(ls+1);
+		u32 dir_len = strlen32(path) - file_len;
 
 		char buff[1024];
 		memcpy(buff, path, dir_len);
@@ -591,7 +588,7 @@ struct SpriteAnimator
 		path::join(file_name, dir.c_str(), _anim_name);
 		file_name += ".sprite_animation";
 		File* f = _fs->open(file_name.c_str(), FileOpenMode::WRITE);
-		f->write(string_stream::c_str(ss), strlen(string_stream::c_str(ss)));
+		f->write(string_stream::c_str(ss), strlen32(string_stream::c_str(ss)));
 		f->close();
 	}
 
@@ -653,10 +650,10 @@ struct SpriteAnimator
 			array::clear(_frames);
 
 			const char* sprite = _entities[_cur_entity];
-			u32 sprite_len = strlen(sprite);
+			u32 sprite_len = strlen32(sprite);
 			char entity[1024];
-			strncpy(entity, sprite, strlen(sprite));
-			entity[sprite_len-7] = '\0';	// remove ".sprite"
+			strncpy(entity, sprite, sizeof(entity)-1);
+			entity[sprite_len-7] = '\0'; // remove ".sprite"
 
 			ResourceManager* resman = device()->_resource_manager;
 			_texture = (TextureResource*)resman->get(RESOURCE_TYPE_TEXTURE, StringId64(entity));
@@ -712,7 +709,7 @@ struct SpriteAnimator
 		if (ImGui::BeginPopup("Add animation"))
 		{
 			ImGui::InputText("Name", _anim_name, sizeof(_anim_name));
-			ImGui::InputFloat("Time", &_anim_time, 0.1f, 0.1f, 1);
+			ImGui::InputFloat("Time", &_anim_time, 0.1f, 0.1f);
 			ImGui::ListBox("Animation Frames", &_listbox_item_current, (const char* const*)array::begin(_listbox_items), array::size(_listbox_items));
 			if (ImGui::Button("Clear Frames", ImVec2(100.0f, 25.0f)))
 			{
@@ -808,7 +805,7 @@ struct LevelEditor
 
 	// State
 	f32 _grid_size;
-	s32 _rotation_snap;
+	f32 _rotation_snap;
 	bool _show_grid;
 	bool _snap_to_grid;
 	bool _debug_render_world;
@@ -819,9 +816,6 @@ struct LevelEditor
 
 	ImVec2 _main_menu_pos;
 	ImVec2 _main_menu_size;
-
-	ImVec2 _toolbar_pos;
-	ImVec2 _toolbar_size;
 
 	Console _console;
 	Inspector _inspector;
@@ -845,8 +839,6 @@ struct LevelEditor
 		, _main_menu_pos(0, 0)
 		, _main_menu_size(0, 0)
 
-		, _toolbar_pos(0, 0)
-		, _toolbar_size(0, 0)
 		, _animator(source_dir)
 	{
 		ResourceManager* resman = device()->_resource_manager;
@@ -878,12 +870,12 @@ struct LevelEditor
 
 		static f32 last_w = 0.0f;
 		static f32 last_h = 0.0f;
-		if (last_w != _scene_view._view_size.x || last_h != _scene_view._view_size.y)
+		if (last_w != _scene_view._size.x || last_h != _scene_view._size.y)
 		{
-			last_w = _scene_view._view_size.x;
-			last_h = _scene_view._view_size.y;
-			device()->_width  = _scene_view._view_size.x != 0.0f ? _scene_view._view_size.x : 128.0f;
-			device()->_height = _scene_view._view_size.y != 0.0f ? _scene_view._view_size.y : 128.0f;
+			last_w = _scene_view._size.x;
+			last_h = _scene_view._size.y;
+			device()->_width  = u16(_scene_view._size.x != 0.0f ? _scene_view._size.x : 128.0f);
+			device()->_height = u16(_scene_view._size.y != 0.0f ? _scene_view._size.y : 128.0f);
 		}
 
 		u32 message_count = 0;
@@ -930,16 +922,14 @@ struct LevelEditor
 						else
 							CE_FATAL("Unknown severity");
 
-						ConsoleLog log(ls, message.c_str());
-						vector::push_back(_console._console_items, log);
+						_console.add_log(ls, message.c_str());
 					}
 					else
 					{
-						ConsoleLog log(LogSeverity::LOG_ERROR, "Unknown message type");
-						vector::push_back(_console._console_items, log);
+						_console.add_log(LogSeverity::LOG_ERROR, "Unknown message type");
 					}
 
-					console_scroll_to_bottom();
+					console_scroll_to_bottom(_console);
 				}
 			}
 		}
@@ -982,6 +972,8 @@ struct LevelEditor
 				tool_send_state();
 			}
 
+			ImGui::Separator();
+
 			if (ImGui::ImageButton((void*)(uintptr_t)axis_local_texture->handle.idx, ImVec2(16, 16)))
 			{
 				_reference_system = tool::ReferenceSystem::LOCAL;
@@ -994,6 +986,8 @@ struct LevelEditor
 				tool_send_state();
 			}
 
+			ImGui::Separator();
+
 			if (ImGui::ImageButton((void*)(uintptr_t)reference_world_texture->handle.idx, ImVec2(16, 16)))
 			{
 				_snap_mode = tool::SnapMode::RELATIVE;
@@ -1005,6 +999,15 @@ struct LevelEditor
 				_snap_mode = tool::SnapMode::ABSOLUTE;
 				tool_send_state();
 			}
+
+			ImGui::Separator();
+
+			if (ImGui::ImageButton((void*)(uintptr_t)snap_to_grid_texture->handle.idx, ImVec2(16, 16)))
+			{
+				_snap_to_grid = !_snap_to_grid;
+				tool_send_state();
+			}
+
 			ImGui::EndGroup();
 
 			// Draw scene view
@@ -1036,6 +1039,8 @@ struct LevelEditor
 			_animator.draw();
 		}
 		ImGui::EndDock();
+
+		// _sprite_importer.draw();
 
 		imgui_end_frame();
 	}
@@ -1263,7 +1268,7 @@ struct LevelEditor
 				{
 					tool_send_state();
 				}
-				if (ImGui::SliderInt("Snap Rot", &_rotation_snap, 1, 180))
+				if (ImGui::SliderFloat("Snap Rot", &_rotation_snap, 1, 180))
 				{
 					tool_send_state();
 				}
@@ -1304,65 +1309,6 @@ struct LevelEditor
 			_main_menu_size = ImGui::GetWindowSize();
 
 			ImGui::EndMainMenuBar();
-		}
-	}
-
-	void toolbar()
-	{
-		if (ImGui::BeginToolbar("Toolbar", _toolbar_pos, _toolbar_size))
-		{
-			if (ImGui::ToolbarButton((void*)(uintptr_t)tool_place_texture->handle.idx, ImVec4(0, 0, 0, 0), "Place"))
-			{
-				_tool_type = tool::ToolType::PLACE;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)tool_move_texture->handle.idx, ImVec4(0, 0, 0, 0), "Move"))
-			{
-				_tool_type = tool::ToolType::MOVE;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)tool_rotate_texture->handle.idx, ImVec4(0, 0, 0, 0), "Rotate"))
-			{
-				_tool_type = tool::ToolType::ROTATE;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)tool_scale_texture->handle.idx, ImVec4(0, 0, 0, 0), "Scale"))
-			{
-				_tool_type = tool::ToolType::SCALE;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)axis_local_texture->handle.idx, ImVec4(0, 0, 0, 0), "Reference System: Local"))
-			{
-				_reference_system = tool::ReferenceSystem::LOCAL;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)axis_world_texture->handle.idx, ImVec4(0, 0, 0, 0), "Reference System: World"))
-			{
-				_reference_system = tool::ReferenceSystem::WORLD;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)axis_local_texture->handle.idx, ImVec4(0, 0, 0, 0), "Snap Mode: Relative"))
-			{
-				_snap_mode = tool::SnapMode::RELATIVE;
-				tool_send_state();
-			}
-
-			if (ImGui::ToolbarButton((void*)(uintptr_t)reference_world_texture->handle.idx, ImVec4(0, 0, 0, 0), "Snap Mode: Absolute"))
-			{
-				_snap_mode = tool::SnapMode::ABSOLUTE;
-				tool_send_state();
-			}
-
-			_toolbar_pos = ImGui::GetWindowPos();
-			_toolbar_size = ImGui::GetWindowSize();
-
-			ImGui::EndToolbar();
 		}
 	}
 };
@@ -1425,24 +1371,36 @@ bool tool_process_events()
 					if (event.button.pressed)
 					{
 						if (event.button.button_num == crown::KeyboardButton::W)
-							tool::keyboard_pressed(ss, 'w');
+							tool::key_down(ss, "w");
 						if (event.button.button_num == crown::KeyboardButton::A)
-							tool::keyboard_pressed(ss, 'a');
+							tool::key_down(ss, "a");
 						if (event.button.button_num == crown::KeyboardButton::S)
-							tool::keyboard_pressed(ss, 's');
+							tool::key_down(ss, "s");
 						if (event.button.button_num == crown::KeyboardButton::D)
-							tool::keyboard_pressed(ss, 'd');
+							tool::key_down(ss, "d");
+						if (event.button.button_num == crown::KeyboardButton::CTRL_LEFT)
+							tool::key_down(ss, "ctrl_left");
+						if (event.button.button_num == crown::KeyboardButton::SHIFT_LEFT)
+							tool::key_down(ss, "shift_left");
+						if (event.button.button_num == crown::KeyboardButton::ALT_LEFT)
+							tool::key_down(ss, "alt_left");
 					}
 					else
 					{
 						if (event.button.button_num == crown::KeyboardButton::W)
-							tool::keyboard_released(ss, 'w');
+							tool::key_up(ss, "w");
 						if (event.button.button_num == crown::KeyboardButton::A)
-							tool::keyboard_released(ss, 'a');
+							tool::key_up(ss, "a");
 						if (event.button.button_num == crown::KeyboardButton::S)
-							tool::keyboard_released(ss, 's');
+							tool::key_up(ss, "s");
 						if (event.button.button_num == crown::KeyboardButton::D)
-							tool::keyboard_released(ss, 'd');
+							tool::key_up(ss, "d");
+						if (event.button.button_num == crown::KeyboardButton::CTRL_LEFT)
+							tool::key_up(ss, "ctrl_left");
+						if (event.button.button_num == crown::KeyboardButton::SHIFT_LEFT)
+							tool::key_up(ss, "shift_left");
+						if (event.button.button_num == crown::KeyboardButton::ALT_LEFT)
+							tool::key_up(ss, "alt_left");
 					}
 				}
 				break;
@@ -1454,13 +1412,13 @@ bool tool_process_events()
 
 				if (!io.WantCaptureMouse)
 				{
-					ImVec2& mouse_curr = s_editor->_scene_view._mouse_curr;
-					mouse_curr.x = io.MousePos.x - s_editor->_scene_view._view_origin.x;
-					mouse_curr.y = io.MousePos.y - s_editor->_scene_view._view_origin.y;
+					ImVec2& cursor = s_editor->_scene_view._cursor;
+					cursor.x = io.MousePos.x - s_editor->_scene_view._origin.x;
+					cursor.y = io.MousePos.y - s_editor->_scene_view._origin.y;
 
 					tool::set_mouse_state(ss
-						, mouse_curr.x
-						, mouse_curr.y
+						, cursor.x
+						, cursor.y
 						, io.MouseDown[0]
 						, io.MouseDown[2]
 						, io.MouseDown[1]
@@ -1469,9 +1427,9 @@ bool tool_process_events()
 					if (event.button.button_num == crown::MouseButton::LEFT)
 					{
 						if (event.button.pressed)
-							tool::mouse_down(ss, mouse_curr.x, mouse_curr.y);
+							tool::mouse_down(ss, cursor.x, cursor.y);
 						else
-							tool::mouse_up(ss, mouse_curr.x, mouse_curr.y);
+							tool::mouse_up(ss, cursor.x, cursor.y);
 					}
 				}
 				break;
@@ -1489,18 +1447,12 @@ bool tool_process_events()
 
 					if (!io.WantCaptureMouse)
 					{
-						ImVec2& mouse_curr = s_editor->_scene_view._mouse_curr;
-						ImVec2& mouse_last = s_editor->_scene_view._mouse_last;
+						ImVec2& cursor = s_editor->_scene_view._cursor;
 
-						mouse_curr.x = io.MousePos.x - s_editor->_scene_view._view_origin.x;
-						mouse_curr.y = io.MousePos.y - s_editor->_scene_view._view_origin.y;
+						cursor.x = io.MousePos.x - s_editor->_scene_view._origin.x;
+						cursor.y = io.MousePos.y - s_editor->_scene_view._origin.y;
 
-						f32 delta_x = mouse_curr.x - mouse_last.x;
-						f32 delta_y = mouse_curr.y - mouse_last.y;
-
-						tool::mouse_move(ss, mouse_curr.x, mouse_curr.y, delta_x, delta_y);
-
-						mouse_last = mouse_curr;
+						tool::mouse_move(ss, cursor.x, cursor.y);
 					}
 					break;
 

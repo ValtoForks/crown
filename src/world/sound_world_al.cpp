@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -18,7 +18,7 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
-namespace { const crown::log_internal::System SOUND = { "Sound" }; }
+LOG_SYSTEM(SOUND, "sound")
 
 namespace crown
 {

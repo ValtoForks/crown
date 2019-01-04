@@ -1,10 +1,11 @@
 #include "core/error/error.h"
 #include "core/math/math.h"
+#include "core/strings/string.h"
 #include "resource/expression_language.h"
 #include <alloca.h>
-#include <string.h>
-#include <limits.h>
-#include <stdlib.h>
+#include <limits.h> // UINT_MAX
+#include <stdlib.h> // strtof
+#include <string.h> // memmove
 
 namespace crown
 {
@@ -27,9 +28,6 @@ namespace expression_language
 
 	/// Returns the id part of the byte code word.
 	static inline unsigned id_mask(unsigned i) {return i & 0x000fffff;}
-
-	/// Returns true if the byte code word is a BC_PUSH_FLOAT operation.
-	static inline bool is_bc_push_float(unsigned i) {return (i & 0x7f80000) != 0x7f8;}
 
 	/// Opcodes for functions
 	enum OpCode
@@ -164,7 +162,7 @@ namespace expression_language
 		static unsigned find_string(const char *s, unsigned len, unsigned num_strings, const char **strings)
 		{
 			for (unsigned i=0; i<num_strings; ++i)
-				if (strncmp(s, strings[i], len) == 0 && strlen(strings[i]) == len)
+				if (strncmp(s, strings[i], len) == 0 && strlen32(strings[i]) == len)
 					return i;
 			return UINT_MAX;
 		}
@@ -188,13 +186,13 @@ namespace expression_language
 		/// Finds a token representing the identifier in the environment.
 		Token token_for_identifier(const char *identifier) const
 		{
-			return token_for_identifier(identifier, strlen(identifier));
+			return token_for_identifier(identifier, strlen32(identifier));
 		}
 
 		/// True if there is a function matching the specified identifier.
 		bool has_function(char * identifier) const
 		{
-			return find_string(identifier, strlen(identifier), num_functions, function_names) != UINT_MAX;
+			return find_string(identifier, strlen32(identifier), num_functions, function_names) != UINT_MAX;
 		}
 	};
 
@@ -224,7 +222,7 @@ namespace expression_language
 				const char *identifier = p;
 				while ( (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p == '_') || (*p >= '0' && *p <= '9'))
 					p++;
-				token = env.token_for_identifier(identifier, p-identifier);
+				token = env.token_for_identifier(identifier, u32(p-identifier));
 				binary = true;
 			// Operators
 			} else {
@@ -455,26 +453,6 @@ namespace expression_language
 	}
 
 	#endif // CAN_COMPILE
-
-	bool is_constant(const unsigned *byte_code)
-	{
-		unsigned bc = *byte_code++;
-		if (!is_bc_push_float(bc))
-			return false;
-		bc = *byte_code;
-		return bc_mask(bc) == BC_END;
-	}
-
-	float constant_value(const unsigned *byte_code)
-	{
-		unsigned bc = *byte_code;
-		if (is_bc_push_float(bc))
-			return unsigned_to_float(bc);
-		else {
-			CE_FATAL("Not a static expression");
-			return 0;
-		}
-	}
 
 	bool run(const unsigned *byte_code, const float *variables, Stack &stack)
 	{

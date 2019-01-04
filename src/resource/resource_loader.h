@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -8,6 +8,7 @@
 #include "core/containers/types.h"
 #include "core/filesystem/types.h"
 #include "core/strings/string_id.h"
+#include "core/thread/condition_variable.h"
 #include "core/thread/mutex.h"
 #include "core/thread/thread.h"
 #include "core/types.h"
@@ -39,6 +40,7 @@ struct ResourceLoader
 
 	Thread _thread;
 	Mutex _mutex;
+	ConditionVariable _requests_condition;
 	Mutex _loaded_mutex;
 	bool _exit;
 

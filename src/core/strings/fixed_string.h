@@ -1,12 +1,11 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #pragma once
 
 #include "core/strings/string.h"
-#include <algorithm>
 
 namespace crown
 {
@@ -71,7 +70,7 @@ inline bool operator==(const FixedString& a, const FixedString& b)
 
 inline bool operator<(const FixedString& a, const FixedString& b)
 {
-	const u32 len = std::max(a._length, b._length);
+	const u32 len = max(a._length, b._length);
 	return strncmp(a._data, b._data, len) < 0;
 }
 

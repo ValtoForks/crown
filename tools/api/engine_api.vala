@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -90,9 +90,9 @@ namespace Crown
 				);
 		}
 
-		public string mouse_move(int x, int y, int dx, int dy)
+		public string mouse_move(int x, int y)
 		{
-			return "LevelEditor:mouse_move(%d,%d,%d,%d)".printf(x, y, dx, dy);
+			return "LevelEditor:mouse_move(%d,%d)".printf(x, y);
 		}
 
 		public string mouse_wheel(double delta)
@@ -283,11 +283,12 @@ namespace Crown
 				);
 		}
 
-		public string set_sprite(Guid id, double layer, double depth)
+		public string set_sprite(Guid id, double layer, double depth, bool visible)
 		{
-			return @"LevelEditor._objects[\"%s\"]:set_sprite(%f, %f)".printf(id.to_string()
+			return @"LevelEditor._objects[\"%s\"]:set_sprite(%f, %f, %s)".printf(id.to_string()
 				, layer
 				, depth
+				, Lua.bool(visible)
 				);
 		}
 

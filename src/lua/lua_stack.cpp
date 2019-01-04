@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -29,21 +29,30 @@ void LuaStack::check_temporary(int i, const Vector3* p)
 {
 	LuaEnvironment* env = device()->_lua_environment;
 	if (!is_pointer(i) || !env->is_vector3(p))
+	{
 		luaL_typerror(L, i, "Vector3");
+		CE_UNREACHABLE();
+	}
 }
 
 void LuaStack::check_temporary(int i, const Quaternion* p)
 {
 	LuaEnvironment* env = device()->_lua_environment;
 	if (!is_pointer(i) || !env->is_quaternion(p))
+	{
 		luaL_typerror(L, i, "Quaternion");
+		CE_UNREACHABLE();
+	}
 }
 
 void LuaStack::check_temporary(int i, const Matrix4x4* p)
 {
 	LuaEnvironment* env = device()->_lua_environment;
 	if (!is_pointer(i) || !env->is_matrix4x4(p))
+	{
 		luaL_typerror(L, i, "Matrix4x4");
+		CE_UNREACHABLE();
+	}
 }
 #endif // CROWN_DEBUG
 

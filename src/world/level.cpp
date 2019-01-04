@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -24,6 +24,9 @@ Level::Level(Allocator& a, UnitManager& um, World& w, const LevelResource& lr)
 Level::~Level()
 {
 	_marker = 0;
+
+	_node.next = NULL;
+	_node.prev = NULL;
 }
 
 void Level::load(const Vector3& pos, const Quaternion& rot)

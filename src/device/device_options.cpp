@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -15,7 +15,7 @@ static void help(const char* msg = NULL)
 {
 	printf(
 		"The Flexible Game Engine\n"
-		"Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.\n"
+		"Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.\n"
 		"License: https://github.com/dbartolini/crown/blob/master/LICENSE\n"
 		"\n"
 		"Usage:\n"
@@ -24,18 +24,18 @@ static void help(const char* msg = NULL)
 		"Options:\n"
 		"  -h --help                       Display this help.\n"
 		"  -v --version                    Display engine version.\n"
-		"  --source-dir <path>             Use <path> as the source directory for resource compilation.\n"
-		"  --data-dir <path>               Use <path> as the destination directory for compiled resources.\n"
+		"  --source-dir <path>             Specify the <path> of the project's source data.\n"
+		"  --data-dir <path>               Specify the <path> where to put the compiled data.\n"
 		"  --map-source-dir <name> <path>  Mount <path>/<name> at <source-dir>/<name>.\n"
 		"  --boot-dir <prefix>             Use <prefix>/boot.config to boot the engine.\n"
-		"  --compile                       Do a full compile of the resources.\n"
-		"  --platform <platform>           Compile resources for the given <platform>.\n"
+		"  --compile                       Compile the project's source data.\n"
+		"  --platform <platform>           Specify the target <platform> for data compilation.\n"
 		"      linux\n"
 		"      windows\n"
 		"      android\n"
-		"  --continue                      Run the engine after resource compilation.\n"
-		"  --console-port <port>           Set port of the console.\n"
-		"  --wait-console                  Wait for a console connection before starting up.\n"
+		"  --continue                      Run the engine after the data has been compiled.\n"
+		"  --console-port <port>           Set port of the console server.\n"
+		"  --wait-console                  Wait for a console connection before booting the engine.\n"
 		"  --parent-window <handle>        Set the parent window <handle> of the main window.\n"
 		"  --server                        Run the engine in server mode.\n"
 		"\n"
@@ -69,20 +69,22 @@ DeviceOptions::DeviceOptions(Allocator& a, int argc, const char** argv)
 {
 }
 
-int DeviceOptions::parse()
+int DeviceOptions::parse(bool* quit)
 {
 	CommandLine cl(_argc, _argv);
 
 	if (cl.has_option("help", 'h'))
 	{
 		help();
-		return EXIT_FAILURE;
+		*quit = true;
+		return EXIT_SUCCESS;
 	}
 
 	if (cl.has_option("version", 'v'))
 	{
-		printf(CROWN_VERSION);
-		return EXIT_FAILURE;
+		printf("Crown " CROWN_VERSION "\n");
+		*quit = true;
+		return EXIT_SUCCESS;
 	}
 
 	path::reduce(_source_dir, cl.get_parameter(0, "source-dir"));

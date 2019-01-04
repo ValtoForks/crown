@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -21,6 +21,7 @@
 #include "core/os.h"
 #include "core/strings/string.h"
 #include "core/strings/string_stream.h"
+#include "core/time.h"
 #include "core/types.h"
 #include "device/console_server.h"
 #include "device/device.h"
@@ -59,7 +60,7 @@
 
 #define MAX_SUBSYSTEMS_HEAP 8 * 1024 * 1024
 
-namespace { const crown::log_internal::System DEVICE = { "Device" }; }
+LOG_SYSTEM(DEVICE, "device")
 
 namespace crown
 {
@@ -74,9 +75,11 @@ extern bool next_event(OsEvent& ev);
 
 struct BgfxCallback : public bgfx::CallbackI
 {
-	virtual void fatal(bgfx::Fatal::Enum _code, const char* _str)
+	virtual void fatal(const char* _filePath, uint16_t _line, bgfx::Fatal::Enum _code, const char* _str)
 	{
 		CE_ASSERT(false, "Fatal error: 0x%08x: %s", _code, _str);
+		CE_UNUSED(_filePath);
+		CE_UNUSED(_line);
 		CE_UNUSED(_code);
 		CE_UNUSED(_str);
 	}
@@ -84,9 +87,9 @@ struct BgfxCallback : public bgfx::CallbackI
 	virtual void traceVargs(const char* /*_filePath*/, u16 /*_line*/, const char* _format, va_list _argList)
 	{
 		char buf[2048];
-		strncpy(buf, _format, sizeof(buf));
+		strncpy(buf, _format, sizeof(buf)-1);
 		buf[strlen32(buf)-1] = '\0'; // Remove trailing newline
-		logiv(DEVICE, buf, _argList);
+		vlogi(DEVICE, buf, _argList);
 	}
 
 	virtual void profilerBegin(const char* /*_name*/, uint32_t /*_abgr*/, const char* /*_filePath*/, uint16_t /*_line*/)
@@ -144,7 +147,7 @@ struct BgfxAllocator : public bx::AllocatorI
 	virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* /*_file*/, u32 /*_line*/)
 	{
 		if (!_ptr)
-			return _allocator.allocate((u32)_size, (u32)_align == 0 ? 1 : (u32)_align);
+			return _allocator.allocate((u32)_size, (u32)_align == 0 ? 16 : (u32)_align);
 
 		if (_size == 0)
 		{
@@ -153,7 +156,7 @@ struct BgfxAllocator : public bx::AllocatorI
 		}
 
 		// Realloc
-		void* p = _allocator.allocate((u32)_size, (u32)_align == 0 ? 1 : (u32)_align);
+		void* p = _allocator.allocate((u32)_size, (u32)_align == 0 ? 16 : (u32)_align);
 		_allocator.deallocate(_ptr);
 		return p;
 	}
@@ -223,12 +226,13 @@ Device::Device(const DeviceOptions& opts, ConsoleServer& cs)
 	, _pipeline(NULL)
 	, _display(NULL)
 	, _window(NULL)
-	, _worlds(default_allocator())
 	, _width(0)
 	, _height(0)
 	, _quit(false)
 	, _paused(false)
 {
+	_worlds.next = &_worlds;
+	_worlds.prev = &_worlds;
 }
 
 bool Device::process_events(bool vsync)
@@ -393,13 +397,15 @@ void Device::run()
 	_window->set_fullscreen(_boot_config.fullscreen);
 	_window->bgfx_setup();
 
-	bgfx::init(bgfx::RendererType::Count
-		, BGFX_PCI_ID_NONE
-		, 0
-		, _bgfx_callback
-		, _bgfx_allocator
-		);
-	bgfx::reset(_width, _height, (_boot_config.vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE));
+	bgfx::Init init;
+	init.type     = bgfx::RendererType::Count;
+	init.vendorId = BGFX_PCI_ID_NONE;
+	init.resolution.width  = _width;
+	init.resolution.height = _height;
+	init.resolution.reset  = _boot_config.vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE;
+	init.callback  = _bgfx_callback;
+	init.allocator = _bgfx_allocator;
+	bgfx::init(init);
 
 	_shader_manager   = CE_NEW(_allocator, ShaderManager)(default_allocator());
 	_material_manager = CE_NEW(_allocator, MaterialManager)(default_allocator(), *_resource_manager);
@@ -429,15 +435,14 @@ void Device::run()
 
 	_lua_environment->call_global("init", 0);
 
-	s64 time_last = os::clocktime();
-	u16 old_width = 0;
-	u16 old_height = 0;
+	u16 old_width = _width;
+	u16 old_height = _height;
+	s64 time_last = time::now();
 
 	while (!process_events(_boot_config.vsync) && !_quit)
 	{
-		const s64 time = os::clocktime();
-		const f64 freq = (f64)os::clockfrequency();
-		const f32 dt   = f32(f64(time - time_last) / freq);
+		const s64 time = time::now();
+		const f32 dt   = time::seconds(time - time_last);
 		time_last = time;
 
 		profiler_globals::clear();
@@ -458,14 +463,14 @@ void Device::run()
 			_resource_manager->complete_requests();
 
 			{
-				const s64 t0 = os::clocktime();
+				const s64 t0 = time::now();
 				_lua_environment->call_global("update", 1, ARGUMENT_FLOAT, dt);
-				RECORD_FLOAT("lua.update", f32(f64(os::clocktime() - t0) / freq));
+				RECORD_FLOAT("lua.update", f32(time::seconds(time::now() - t0)));
 			}
 			{
-				const s64 t0 = os::clocktime();
+				const s64 t0 = time::now();
 				_lua_environment->call_global("render", 1, ARGUMENT_FLOAT, dt);
-				RECORD_FLOAT("lua.render", f32(f64(os::clocktime() - t0) / freq));
+				RECORD_FLOAT("lua.render", f32(time::seconds(time::now() - t0)));
 			}
 		}
 
@@ -632,31 +637,36 @@ void Device::render(World& world, UnitId camera_unit)
 
 World* Device::create_world()
 {
-	World* w = CE_NEW(default_allocator(), World)(default_allocator()
+	World* world = CE_NEW(default_allocator(), World)(default_allocator()
 		, *_resource_manager
 		, *_shader_manager
 		, *_material_manager
 		, *_unit_manager
 		, *_lua_environment
 		);
-	array::push_back(_worlds, w);
-	return w;
+
+	ListNode* node = &world->_node;
+	ListNode* prev = &_worlds;
+	ListNode* next = _worlds.next;
+
+	node->next = next;
+	node->prev = prev;
+	next->prev = node;
+	prev->next = node;
+
+	return world;
 }
 
-void Device::destroy_world(World& w)
+void Device::destroy_world(World& world)
 {
-	for (u32 i = 0, n = array::size(_worlds); i < n; ++i)
-	{
-		if (&w == _worlds[i])
-		{
-			CE_DELETE(default_allocator(), &w);
-			_worlds[i] = _worlds[n-1];
-			array::pop_back(_worlds);
-			return;
-		}
-	}
+	ListNode* node = &world._node;
 
-	CE_FATAL("World not found");
+	node->next->prev = node->prev;
+	node->prev->next = node->next;
+	node->next = NULL;
+	node->prev = NULL;
+
+	CE_DELETE(default_allocator(), &world);
 }
 
 ResourcePackage* Device::create_resource_package(StringId64 id)

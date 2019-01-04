@@ -1,5 +1,5 @@
 --
--- Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+-- Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
 -- License: https://github.com/dbartolini/crown/blob/master/LICENSE
 --
 
@@ -49,15 +49,10 @@ project "bullet"
 	configuration {}
 
 	files {
-		BULLET_DIR .. "src/*.cpp",
 		BULLET_DIR .. "src/BulletCollision/**.cpp",
 		BULLET_DIR .. "src/BulletDynamics/**.cpp",
 		BULLET_DIR .. "src/BulletSoftBody/*.cpp",
 		BULLET_DIR .. "src/LinearMath/**.cpp",
-		BULLET_DIR .. "src/Bullet3Collision/**.cpp",
-		BULLET_DIR .. "src/Bullet3Common/**.cpp",
-		BULLET_DIR .. "src/Bullet3Dynamics/**.cpp",
-		BULLET_DIR .. "src/Bullet3Geometry/**.cpp",
 	}
 
 	removefiles {

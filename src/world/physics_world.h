@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -160,8 +160,17 @@ struct PhysicsWorld
 	///
 	void joint_destroy(JointInstance i);
 
-	/// Performs a raycast.
-	void raycast(const Vector3& from, const Vector3& dir, f32 len, RaycastMode::Enum mode, Array<RaycastHit>& hits);
+	/// Casts a ray into the physics world and returns info about the closest collision if any.
+	bool cast_ray(RaycastHit& hit, const Vector3& from, const Vector3& dir, f32 len);
+
+	/// Casts a ray into the physics world and returns info about all the collisions if any.
+	bool cast_ray_all(Array<RaycastHit>& hits, const Vector3& from, const Vector3& dir, f32 len);
+
+	/// Casts a sphere into the physics world and returns info about the closest collision if any.
+	bool cast_sphere(RaycastHit& hit, const Vector3& from, f32 radius, const Vector3& dir, f32 len);
+
+	/// Casts a box into the physics world and returns info about the closest collision if any.
+	bool cast_box(RaycastHit& hit, const Vector3& from, const Vector3& half_extents, const Vector3& dir, f32 len);
 
 	/// Returns the gravity.
 	Vector3 gravity() const;

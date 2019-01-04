@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -72,13 +72,13 @@ inline StringStream& operator<<(StringStream& s, u64 val)
 /// Appends @a val to the stream @a s using appropriate formatting.
 inline StringStream& operator<<(StringStream& s, f32 val)
 {
-	return string_stream::stream_printf(s, "%g", val);
+	return string_stream::stream_printf(s, "%.9g", val);
 }
 
 /// Appends @a val to the stream @a s using appropriate formatting.
 inline StringStream& operator<<(StringStream& s, f64 val)
 {
-	return string_stream::stream_printf(s, "%g", val);
+	return string_stream::stream_printf(s, "%.17g", val);
 }
 
 /// Appends the string @a str to the stream @a s.

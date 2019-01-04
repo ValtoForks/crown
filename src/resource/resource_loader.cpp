@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -16,7 +16,7 @@
 #include "device/log.h"
 #include "resource/resource_loader.h"
 
-namespace { const crown::log_internal::System RESOURCE_LOADER = { "ResourceLoader" }; }
+LOG_SYSTEM(RESOURCE_LOADER, "resource_loader")
 
 namespace crown
 {
@@ -38,6 +38,7 @@ ResourceLoader::ResourceLoader(Filesystem& data_filesystem)
 ResourceLoader::~ResourceLoader()
 {
 	_exit = true;
+	_requests_condition.signal(); // Spurious wake to exit thread
 	_thread.stop();
 }
 
@@ -45,6 +46,7 @@ void ResourceLoader::add_request(const ResourceRequest& rr)
 {
 	ScopedMutex sm(_mutex);
 	queue::push_back(_requests, rr);
+	_requests_condition.signal();
 }
 
 void ResourceLoader::flush()
@@ -85,15 +87,14 @@ void ResourceLoader::register_fallback(StringId64 type, StringId64 name)
 
 s32 ResourceLoader::run()
 {
-	while (!_exit)
+	while (1)
 	{
 		_mutex.lock();
-		if (queue::empty(_requests))
-		{
-			_mutex.unlock();
-			os::sleep(16);
-			continue;
-		}
+		while (queue::empty(_requests) && !_exit)
+			_requests_condition.wait(_mutex);
+
+		if (_exit)
+			break;
 
 		ResourceRequest rr = queue::front(_requests);
 		_mutex.unlock();
@@ -146,6 +147,7 @@ s32 ResourceLoader::run()
 		_mutex.unlock();
 	}
 
+	_mutex.unlock();
 	return 0;
 }
 

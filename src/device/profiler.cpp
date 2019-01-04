@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #include "core/containers/array.h"
 #include "core/math/vector3.h"
 #include "core/memory/memory.h"
-#include "core/os.h"
 #include "core/thread/mutex.h"
+#include "core/time.h"
 #include "device/profiler.h"
 
 namespace crown
@@ -69,7 +69,7 @@ namespace profiler
 	{
 		EnterProfileScope ev;
 		ev.name = name;
-		ev.time = os::clocktime();
+		ev.time = time::now();
 
 		push(ProfilerEventType::ENTER_PROFILE_SCOPE, ev);
 	}
@@ -77,7 +77,7 @@ namespace profiler
 	void leave_profile_scope()
 	{
 		LeaveProfileScope ev;
-		ev.time = os::clocktime();
+		ev.time = time::now();
 
 		push(ProfilerEventType::LEAVE_PROFILE_SCOPE, ev);
 	}

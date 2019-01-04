@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 namespace Crown
 {
-	const string CROWN_VERSION = "0.0.32";
+	const string CROWN_VERSION = "0.1.1";
 
 #if CROWN_PLATFORM_LINUX
 	const string ENGINE_DIR = ".";

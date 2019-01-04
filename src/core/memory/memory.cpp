@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -305,12 +305,9 @@ namespace memory_globals
 {
 	using namespace memory;
 
-	static const u32 SIZE = sizeof(HeapAllocator)
-		+ sizeof(ScratchAllocator)
-		;
-	char _buffer[SIZE];
-	HeapAllocator* _default_allocator = NULL;
-	ScratchAllocator* _default_scratch_allocator = NULL;
+	static char _buffer[sizeof(HeapAllocator) + sizeof(ScratchAllocator)];
+	static HeapAllocator* _default_allocator;
+	static ScratchAllocator* _default_scratch_allocator;
 
 	void init()
 	{

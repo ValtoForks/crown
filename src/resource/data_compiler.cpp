@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -17,6 +17,7 @@
 #include "core/os.h"
 #include "core/strings/dynamic_string.h"
 #include "core/strings/string_stream.h"
+#include "core/time.h"
 #include "device/console_server.h"
 #include "device/device_options.h"
 #include "device/log.h"
@@ -37,8 +38,9 @@
 #include "resource/texture_resource.h"
 #include "resource/types.h"
 #include "resource/unit_resource.h"
+#include <algorithm>
 
-namespace { const crown::log_internal::System COMPILER = { "Compiler" }; }
+LOG_SYSTEM(DATA_COMPILER, "data_compiler")
 
 namespace crown
 {
@@ -89,13 +91,7 @@ static void console_command_compile(ConsoleServer& cs, TCPSocket client, const c
 		cs.send(client, string_stream::c_str(ss));
 	}
 
-	logi(COMPILER, "Compiling '%s'", id.c_str());
 	bool succ = ((DataCompiler*)user_data)->compile(data_dir.c_str(), platform.c_str());
-
-	if (succ)
-		logi(COMPILER, "Compiled '%s'", id.c_str());
-	else
-		loge(COMPILER, "Failed to compile '%s'", id.c_str());
 
 	{
 		TempAllocator512 ta;
@@ -273,6 +269,8 @@ void DataCompiler::add_ignore_glob(const char* glob)
 
 void DataCompiler::scan()
 {
+	const s64 time_start = time::now();
+
 	// Scan all source directories
 	auto cur = map::begin(_source_dirs);
 	auto end = map::end(_source_dirs);
@@ -314,11 +312,14 @@ void DataCompiler::scan()
 		scan_source_dir(cur->pair.first.c_str(), "");
 	}
 
+	logi(DATA_COMPILER, "Scanned data in %.2fs", time::seconds(time::now() - time_start));
 	_file_monitor.start(map::begin(_source_dirs)->pair.second.c_str(), true, filemonitor_callback, this);
 }
 
 bool DataCompiler::compile(const char* data_dir, const char* platform)
 {
+	const s64 time_start = time::now();
+
 	FilesystemDisk data_filesystem(default_allocator());
 	data_filesystem.set_prefix(data_dir);
 	data_filesystem.create_directory("");
@@ -329,7 +330,16 @@ bool DataCompiler::compile(const char* data_dir, const char* platform)
 	if (!data_filesystem.exists(CROWN_TEMP_DIRECTORY))
 		data_filesystem.create_directory(CROWN_TEMP_DIRECTORY);
 
-	std::sort(vector::begin(_files), vector::end(_files));
+	std::sort(vector::begin(_files), vector::end(_files), [](const DynamicString& resource_a, const DynamicString& resource_b)
+		{
+#define PACKAGE ".package"
+			if ( resource_a.has_suffix(PACKAGE) && !resource_b.has_suffix(PACKAGE))
+				return false;
+			if (!resource_a.has_suffix(PACKAGE) &&  resource_b.has_suffix(PACKAGE))
+				return true;
+			return resource_a < resource_b;
+#undef PACKAGE
+		});
 
 	bool success = false;
 
@@ -367,12 +377,12 @@ bool DataCompiler::compile(const char* data_dir, const char* platform)
 
 		path::join(path, CROWN_DATA_DIRECTORY, dst_path.c_str());
 
-		logi(COMPILER, "%s", src_path.c_str());
+		logi(DATA_COMPILER, "%s", src_path.c_str());
 
 		if (!can_compile(_type))
 		{
-			loge(COMPILER, "Unknown resource type: '%s'", type);
-			loge(COMPILER, "Append extension to " CROWN_DATAIGNORE " to ignore the type");
+			loge(DATA_COMPILER, "Unknown resource type: '%s'", type);
+			loge(DATA_COMPILER, "Append extension to " CROWN_DATAIGNORE " to ignore the type");
 			success = false;
 			break;
 		}
@@ -398,36 +408,39 @@ bool DataCompiler::compile(const char* data_dir, const char* platform)
 			success = false;
 		}
 
-		if (!success)
-		{
-			loge(COMPILER, "Error");
-			break;
-		}
-		else
+		if (success)
 		{
 			if (!map::has(_data_index, dst_path))
 				map::set(_data_index, dst_path, src_path);
 		}
+		else
+		{
+			loge(DATA_COMPILER, "Failed to compile data");
+			break;
+		}
 	}
 
-	// Write index
+	// Write data index
 	{
 		File* file = data_filesystem.open("data_index.sjson", FileOpenMode::WRITE);
-		if (!file)
-			return false;
-
-		StringStream ss(default_allocator());
-
-		auto cur = map::begin(_data_index);
-		auto end = map::end(_data_index);
-		for (; cur != end; ++cur)
+		if (file)
 		{
-			ss << "\"" << cur->pair.first.c_str() << "\" = \"" << cur->pair.second.c_str() << "\"\n";
-		}
+			StringStream ss(default_allocator());
 
-		file->write(string_stream::c_str(ss), strlen32(string_stream::c_str(ss)));
-		data_filesystem.close(*file);
+			auto cur = map::begin(_data_index);
+			auto end = map::end(_data_index);
+			for (; cur != end; ++cur)
+			{
+				ss << "\"" << cur->pair.first.c_str() << "\" = \"" << cur->pair.second.c_str() << "\"\n";
+			}
+
+			file->write(string_stream::c_str(ss), strlen32(string_stream::c_str(ss)));
+			data_filesystem.close(*file);
+		}
 	}
+
+	if (success)
+		logi(DATA_COMPILER, "Compiled data in %.2fs", time::seconds(time::now() - time_start));
 
 	return success;
 }
@@ -460,7 +473,7 @@ bool DataCompiler::can_compile(StringId64 type)
 
 void DataCompiler::error(const char* msg, va_list args)
 {
-	logev(COMPILER, msg, args);
+	vloge(DATA_COMPILER, msg, args);
 	longjmp(_jmpbuf, 1);
 }
 
@@ -531,15 +544,8 @@ struct InitMemoryGlobals
 	}
 };
 
-int main_data_compiler(int argc, char** argv)
+int main_data_compiler(const DeviceOptions& opts)
 {
-	InitMemoryGlobals m;
-	CE_UNUSED(m);
-
-	DeviceOptions opts(default_allocator(), argc, (const char**)argv);
-	if (opts.parse() == EXIT_FAILURE)
-		return EXIT_FAILURE;
-
 	console_server_globals::init();
 	console_server()->listen(CROWN_DEFAULT_COMPILER_PORT, opts._wait_console);
 
@@ -581,6 +587,7 @@ int main_data_compiler(int argc, char** argv)
 	// Add ignore globs
 	dc->add_ignore_glob("*.bak");
 	dc->add_ignore_glob("*.dds");
+	dc->add_ignore_glob("*.importer_settings");
 	dc->add_ignore_glob("*.ktx");
 	dc->add_ignore_glob("*.ogg");
 	dc->add_ignore_glob("*.png");

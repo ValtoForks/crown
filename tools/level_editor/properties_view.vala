@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -38,7 +38,7 @@ namespace Crown
 			this.column_spacing = 12;
 
 			Gtk.Label l = new Label(label);
-			l.width_chars = 10;
+			l.width_chars = 13;
 			l.set_alignment(1.0f, 0.5f);
 
 			PropertyRow r = new PropertyRow(w);
@@ -72,11 +72,10 @@ namespace Crown
 
 			// Widgets
 			_position = new SpinButtonVector3(Vector3(0, 0, 0), Vector3(-9999.9, -9999.9, -9999.9), Vector3(9999.9, 9999.9, 9999.9));
-			_rotation = new SpinButtonRotation(Vector3(0, 0, 0));
-			_scale    = new SpinButtonVector3(Vector3(0, 0, 0), Vector3(0.1, 0.1, 0.1), Vector3(10.0, 10.0, 10.0));
-
 			_position.value_changed.connect(on_value_changed);
+			_rotation = new SpinButtonRotation(Vector3(0, 0, 0));
 			_rotation.value_changed.connect(on_value_changed);
+			_scale = new SpinButtonVector3(Vector3(0, 0, 0), Vector3(0.1, 0.1, 0.1), Vector3(10.0, 10.0, 10.0));
 			_scale.value_changed.connect(on_value_changed);
 
 			add_row("Position", _position);
@@ -124,12 +123,12 @@ namespace Crown
 
 			// Widgets
 			_mesh_resource = new Gtk.Entry();
-			_geometry = new Gtk.Entry();
-			_material = new Gtk.Entry();
-			_visible = new CheckBox();
 			_mesh_resource.sensitive = false;
+			_geometry = new Gtk.Entry();
 			_geometry.sensitive = false;
+			_material = new Gtk.Entry();
 			_material.sensitive = false;
+			_visible = new CheckBox();
 
 			add_row("Mesh", _mesh_resource);
 			add_row("Geometry", _geometry);
@@ -168,14 +167,13 @@ namespace Crown
 			_sprite_resource = new Gtk.Entry();
 			_material = new Gtk.Entry();
 			_layer = new SpinButtonDouble(0.0, 0.0, 7.0);
+			_layer.value_changed.connect(on_value_changed);
 			_depth = new SpinButtonDouble(0.0, 0.0, 9999.0);
+			_depth.value_changed.connect(on_value_changed);
 			_visible = new CheckBox();
+			_visible.value_changed.connect(on_value_changed);
 			_sprite_resource.sensitive = false;
 			_material.sensitive = false;
-
-			_layer.value_changed.connect(on_value_changed);
-			_depth.value_changed.connect(on_value_changed);
-			_visible.value_changed.connect(on_value_changed);
 
 			add_row("Sprite", _sprite_resource);
 			add_row("Material", _material);
@@ -225,19 +223,18 @@ namespace Crown
 			_level = level;
 
 			// Widgets
-			_type       = new ComboBoxMap();
+			_type = new ComboBoxMap();
+			_type.value_changed.connect(on_value_changed);
 			_type.append("directional", "Directional");
 			_type.append("omni", "Omni");
 			_type.append("spot", "Spot");
-			_range      = new SpinButtonDouble(0.0, 0.0, 999.0);
-			_intensity  = new SpinButtonDouble(0.0, 0.0,  10.0);
-			_spot_angle = new SpinButtonDouble(0.0, 0.0,  90.0);
-			_color      = new ColorButtonVector3();
-
-			_type.value_changed.connect(on_value_changed);
+			_range = new SpinButtonDouble(0.0, 0.0, 999.0);
 			_range.value_changed.connect(on_value_changed);
+			_intensity = new SpinButtonDouble(0.0, 0.0,  10.0);
 			_intensity.value_changed.connect(on_value_changed);
+			_spot_angle = new SpinButtonDouble(0.0, 0.0,  90.0);
 			_spot_angle.value_changed.connect(on_value_changed);
+			_color = new ColorButtonVector3();
 			_color.value_changed.connect(on_value_changed);
 
 			add_row("Type", _type);
@@ -296,13 +293,12 @@ namespace Crown
 			_projection = new ComboBoxMap();
 			_projection.append("orthographic", "Orthographic");
 			_projection.append("perspective", "Perspective");
-			_fov        = new SpinButtonDouble(0.0, 1.0,   90.0);
-			_near_range = new SpinButtonDouble(0.0, 0.001, 9999.0);
-			_far_range  = new SpinButtonDouble(0.0, 0.001, 9999.0);
-
 			_projection.value_changed.connect(on_value_changed);
+			_fov = new SpinButtonDouble(0.0, 1.0,   90.0);
 			_fov.value_changed.connect(on_value_changed);
+			_near_range = new SpinButtonDouble(0.0, 0.001, 9999.0);
 			_near_range.value_changed.connect(on_value_changed);
+			_far_range  = new SpinButtonDouble(0.0, 0.001, 9999.0);
 			_far_range.value_changed.connect(on_value_changed);
 
 			add_row("Projection", _projection);
@@ -333,6 +329,100 @@ namespace Crown
 			_fov.value        = fov*(180.0/Math.PI);
 			_near_range.value = near_range;
 			_far_range.value  = far_range;
+		}
+	}
+
+	public class ColliderComponentView : ComponentView
+	{
+		// Data
+		Level _level;
+
+		// Widgets
+		private Gtk.Entry _shape;
+		private Gtk.Entry _scene;
+		private Gtk.Entry _name;
+		private Gtk.Entry _material;
+
+		public ColliderComponentView(Level level)
+		{
+			// Data
+			_level = level;
+
+			// Widgets
+			_shape = new Gtk.Entry();
+			_shape.sensitive = false;
+			_scene = new Gtk.Entry();
+			_scene.sensitive = false;
+			_name = new Gtk.Entry();
+			_name.sensitive = false;
+			_material = new Gtk.Entry();
+			_material.sensitive = false;
+
+			add_row("Shape", _shape);
+			add_row("Scene", _scene);
+			add_row("Name", _name);
+			add_row("Material", _material);
+		}
+
+		public override void update()
+		{
+			Unit unit = new Unit(_level._db, _id, _level._prefabs);
+			_shape.text    = unit.get_component_property_string(_component_id, "data.shape");
+			_scene.text    = unit.get_component_property_string(_component_id, "data.scene");
+			_name.text     = unit.get_component_property_string(_component_id, "data.name");
+			_material.text = unit.get_component_property_string(_component_id, "data.material");
+		}
+	}
+
+	public class ActorComponentView : ComponentView
+	{
+		// Data
+		Level _level;
+
+		// Widgets
+		private Gtk.Entry _class;
+		private Gtk.Entry _collision_filter;
+		private SpinButtonDouble _mass;
+		private Gtk.Entry _material;
+
+		public ActorComponentView(Level level)
+		{
+			// Data
+			_level = level;
+
+			// Widgets
+			_class = new Gtk.Entry();
+			_collision_filter = new Gtk.Entry();
+			_material = new Gtk.Entry();
+			_mass = new SpinButtonDouble(1.0, 0.0, 9999.0);
+			_mass.value_changed.connect(on_value_changed);
+			_class.sensitive = false;
+			_collision_filter.sensitive = false;
+			_material.sensitive = false;
+
+			add_row("Class", _class);
+			add_row("Collision Filter", _collision_filter);
+			add_row("Material", _material);
+			add_row("Mass", _mass);
+		}
+
+		private void on_value_changed()
+		{
+			Unit unit = new Unit(_level._db, _id, _level._prefabs);
+			unit.set_component_property_string(_component_id, "data.class", _class.text);
+			unit.set_component_property_string(_component_id, "data.collision_filter", _collision_filter.text);
+			unit.set_component_property_string(_component_id, "data.material", _material.text);
+			unit.set_component_property_double(_component_id, "data.mass", _mass.value);
+			unit.set_component_property_string(_component_id, "type", "actor");
+		}
+
+		public override void update()
+		{
+			Unit unit = new Unit(_level._db, _id, _level._prefabs);
+			_class.text            = unit.get_component_property_string(_component_id, "data.class");
+			_collision_filter.text = unit.get_component_property_string(_component_id, "data.collision_filter");
+			_material.text         = unit.get_component_property_string(_component_id, "data.material");
+			_mass.value            = unit.get_component_property_double(_component_id, "data.mass");
 		}
 	}
 
@@ -548,7 +638,7 @@ namespace Crown
 
 			// Widgets
 			_components_vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
-			_components_vbox.margin_right = 18;
+			_components_vbox.margin_bottom = 18;
 
 			// Unit
 			add_component_view("Unit",                    "name",                    0, new UnitView(_level));
@@ -557,6 +647,8 @@ namespace Crown
 			add_component_view("Camera",                  "camera",                  2, new CameraComponentView(_level));
 			add_component_view("Mesh Renderer",           "mesh_renderer",           3, new MeshRendererComponentView(_level));
 			add_component_view("Sprite Renderer",         "sprite_renderer",         3, new SpriteRendererComponentView(_level));
+			add_component_view("Collider",                "collider",                3, new ColliderComponentView(_level));
+			add_component_view("Actor",                   "actor",                   3, new ActorComponentView(_level));
 			add_component_view("Script",                  "script",                  3, new ScriptComponentView(_level));
 			add_component_view("Animation State Machine", "animation_state_machine", 3, new AnimationStateMachine(_level));
 
@@ -578,9 +670,8 @@ namespace Crown
 
 			_current_widget = null;
 
-			set_current_widget(_nothing_to_show);
-
-			set_size_request(300, 200);
+			this.get_style_context().add_class("properties-view");
+			this.set_current_widget(_nothing_to_show);
 		}
 
 		private void add_component_view(string label, string component_type, int position, ComponentView cv)

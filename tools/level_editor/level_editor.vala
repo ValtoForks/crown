@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -72,16 +72,15 @@ namespace Crown
 		private PreferencesDialog _preferences_dialog;
 		private ResourceBrowser _resource_browser;
 
-		private Gtk.Alignment _alignment_engine;
-		private Gtk.Alignment _alignment_level_tree_view;
-		private Gtk.Alignment _alignment_properties_view;
+		private Slide _engine_view_slide;
+		private Slide _level_tree_view_slide;
+		private Slide _properties_view_slide;
 
 		private Gtk.ActionGroup _action_group;
 		private Gtk.UIManager _ui_manager;
 		private Gtk.Toolbar _toolbar;
 		private Gtk.Paned _pane_left;
 		private Gtk.Paned _pane_right;
-		private Gtk.Notebook _notebook_left;
 		private Gtk.Notebook _notebook_right;
 		private Gtk.Box _vbox;
 		private Gtk.FileFilter _file_filter;
@@ -91,8 +90,9 @@ namespace Crown
 		const Gtk.ActionEntry[] action_entries =
 		{
 			{ "menu-file",            null,  "_File",              null,             null,         null                       },
-			{ "new",                  null,  "New",                "<ctrl>N",        null,         on_new                     },
-			{ "open",                 null,  "Open...",            "<ctrl>O",        null,         on_open                    },
+			{ "new-level",            null,  "New Level",          "<ctrl>N",        null,         on_new_level               },
+			{ "open-level",           null,  "Open Level...",      "<ctrl>O",        null,         on_open_level              },
+			{ "open-project",         null,  "Open Project...",    null,             null,         on_open_project            },
 			{ "save",                 null,  "Save",               "<ctrl>S",        null,         on_save                    },
 			{ "save-as",              null,  "Save As...",         "<shift><ctrl>S", null,         on_save_as                 },
 			{ "import",               null,  "Import",             null,             null,         null                       },
@@ -101,6 +101,7 @@ namespace Crown
 			{ "import-sounds",        null,  "Sounds...",          null,             null,         on_import_sounds           },
 			{ "import-textures",      null,  "Textures...",        null,             null,         on_import_textures         },
 			{ "preferences",          null,  "Preferences",        null,             null,         on_preferences             },
+			{ "deploy",               null,  "Deploy...",          null,             null,         on_deploy                  },
 			{ "quit",                 null,  "Quit",               "<ctrl>Q",        null,         on_quit                    },
 			{ "menu-edit",            null,  "_Edit",              null,             null,         null                       },
 			{ "undo",                 null,  "Undo",               "<ctrl>Z",        null,         on_undo                    },
@@ -242,12 +243,12 @@ namespace Crown
 			_level_layers_treeview = new LevelLayersTreeView(_database, _level);
 			_properties_view = new PropertiesView(_level);
 
-			_alignment_engine = new Gtk.Alignment(0, 0, 1, 1);
-			_alignment_level_tree_view = new Gtk.Alignment(0, 0, 1, 1);
-			_alignment_properties_view = new Gtk.Alignment(0, 0, 1, 1);
-			_alignment_engine.add(new StartingCompiler());
-			_alignment_level_tree_view.add(new StartingCompiler());
-			_alignment_properties_view.add(new StartingCompiler());
+			_engine_view_slide = new Slide();
+			_level_tree_view_slide = new Slide();
+			_properties_view_slide = new Slide();
+			_engine_view_slide.show_widget(new StartingCompiler());
+			_level_tree_view_slide.show_widget(new StartingCompiler());
+			_properties_view_slide.show_widget(new StartingCompiler());
 
 			_action_group = new Gtk.ActionGroup("group");
 			_action_group.add_actions(action_entries, this);
@@ -276,7 +277,7 @@ namespace Crown
 			_toolbar.set_style(Gtk.ToolbarStyle.ICONS);
 
 			_pane_left = new Gtk.Paned(Gtk.Orientation.VERTICAL);
-			_pane_left.pack1(_alignment_engine, true, true);
+			_pane_left.pack1(_engine_view_slide, true, true);
 			_pane_left.pack2(_console_view, true, true);
 
 			Gtk.Box vb = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
@@ -289,21 +290,18 @@ namespace Crown
 			_notebook_right.append_page(_level_layers_treeview, new Gtk.Image.from_icon_name("level-layers", IconSize.SMALL_TOOLBAR));
 
 			Gtk.Paned rb = new Gtk.Paned(Gtk.Orientation.VERTICAL);
-			rb.pack1(_alignment_level_tree_view, true, true);
-			rb.pack2(_alignment_properties_view, true, true);
+			rb.pack1(_level_tree_view_slide, true, true);
+			rb.pack2(_properties_view_slide, true, true);
 
 			_pane_right = new Gtk.Paned(Gtk.Orientation.HORIZONTAL);
 			_pane_right.pack1(vb, true, false);
 			_pane_right.pack2(rb, true, false);
-
-			_notebook_left = new Notebook();
-			_notebook_left.show_border = false;
-			_notebook_left.append_page(_pane_right, new Gtk.Label("Level"));
+			_pane_right.set_position(1000);
 
 			MenuBar menu = (MenuBar)_ui_manager.get_widget("/menubar");
 			_vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
 			_vbox.pack_start(menu, false, false, 0);
-			_vbox.pack_start(_notebook_left, true, true, 0);
+			_vbox.pack_start(_pane_right, true, true, 0);
 
 			_file_filter = new FileFilter();
 			_file_filter.set_filter_name("Level (*.level)");
@@ -336,9 +334,11 @@ namespace Crown
 		private bool on_key_press(Gdk.EventKey ev)
 		{
 			if (ev.keyval == Gdk.Key.Control_L)
-				_engine.send_script(LevelEditorApi.key_down("left_ctrl"));
+				_engine.send_script(LevelEditorApi.key_down("ctrl_left"));
 			else if (ev.keyval == Gdk.Key.Shift_L)
-				_engine.send_script(LevelEditorApi.key_down("left_shift"));
+				_engine.send_script(LevelEditorApi.key_down("shift_left"));
+			else if (ev.keyval == Gdk.Key.Alt_L)
+				_engine.send_script(LevelEditorApi.key_down("alt_left"));
 
 			return false;
 		}
@@ -346,9 +346,11 @@ namespace Crown
 		private bool on_key_release(Gdk.EventKey ev)
 		{
 			if (ev.keyval == Gdk.Key.Control_L)
-				_engine.send_script(LevelEditorApi.key_up("left_ctrl"));
+				_engine.send_script(LevelEditorApi.key_up("ctrl_left"));
 			else if (ev.keyval == Gdk.Key.Shift_L)
-				_engine.send_script(LevelEditorApi.key_up("left_shift"));
+				_engine.send_script(LevelEditorApi.key_up("shift_left"));
+			else if (ev.keyval == Gdk.Key.Alt_L)
+				_engine.send_script(LevelEditorApi.key_up("alt_left"));
 
 			return false;
 		}
@@ -367,35 +369,35 @@ namespace Crown
 
 		private void on_compiler_connected()
 		{
-			_console_view.logi("Editor", "Compiler connected");
+			_console_view.logi("editor", "Compiler connected");
 			_compiler.receive_async();
 		}
 
 		private void on_compiler_disconnected()
 		{
-			_console_view.logi("Editor", "Compiler disconnected");
+			_console_view.logi("editor", "Compiler disconnected");
 		}
 
 		private void on_engine_connected()
 		{
-			_console_view.logi("Editor", "Engine connected");
+			_console_view.logi("editor", "Engine connected");
 			_engine.receive_async();
 		}
 
 		private void on_engine_disconnected()
 		{
-			_console_view.logi("Editor", "Engine disconnected");
+			_console_view.logi("editor", "Engine disconnected");
 		}
 
 		private void on_game_connected()
 		{
-			_console_view.logi("Editor", "Game connected");
+			_console_view.logi("editor", "Game connected");
 			_game.receive_async();
 		}
 
 		private void on_game_disconnected()
 		{
-			_console_view.logi("Editor", "Game disconnected");
+			_console_view.logi("editor", "Game disconnected");
 			_project.delete_level_editor_test_level();
 		}
 
@@ -515,11 +517,11 @@ namespace Crown
 			}
 			else if (msg_type == "error")
 			{
-				_console_view.loge("Editor", "Error: " + (string)msg["message"]);
+				_console_view.loge("editor", "Error: " + (string)msg["message"]);
 			}
 			else
 			{
-				_console_view.loge("Editor", "Unknown message type: " + msg_type);
+				_console_view.loge("editor", "Unknown message type: " + msg_type);
 			}
 
 			// Receive next message
@@ -574,7 +576,7 @@ namespace Crown
 			}
 			catch (Error e)
 			{
-				_console_view.loge("Editor", e.message);
+				_console_view.loge("editor", e.message);
 			}
 
 			for (int tries = 0; !_compiler.is_connected() && tries < 5; ++tries)
@@ -594,17 +596,9 @@ namespace Crown
 					_engine_view.button_press_event.connect(on_button_press);
 					_engine_view.button_release_event.connect(on_button_release);
 
-					_alignment_engine.remove(_alignment_engine.get_child());
-					_alignment_level_tree_view.remove(_alignment_level_tree_view.get_child());
-					_alignment_properties_view.remove(_alignment_properties_view.get_child());
-
-					_alignment_engine.add(_engine_view);
-					_alignment_level_tree_view.add(_notebook_right);
-					_alignment_properties_view.add(_properties_view);
-
-					_alignment_engine.show_all();
-					_alignment_level_tree_view.show_all();
-					_alignment_properties_view.show_all();
+					_engine_view_slide.show_widget(_engine_view);
+					_level_tree_view_slide.show_widget(_notebook_right);
+					_properties_view_slide.show_widget(_properties_view);
 				}
 			});
 		}
@@ -629,6 +623,9 @@ namespace Crown
 
 		private void start_engine(uint window_xid)
 		{
+			if (window_xid == 0)
+				return;
+
 			string args[] =
 			{
 				ENGINE_EXE,
@@ -647,7 +644,7 @@ namespace Crown
 			}
 			catch (Error e)
 			{
-				_console_view.loge("Editor", e.message);
+				_console_view.loge("editor", e.message);
 			}
 
 			for (int tries = 0; !_engine.is_connected() && tries < 5; ++tries)
@@ -710,7 +707,7 @@ namespace Crown
 					}
 					catch (Error e)
 					{
-						_console_view.loge("Editor", e.message);
+						_console_view.loge("editor", e.message);
 					}
 
 					for (int tries = 0; !_game.is_connected() && tries < 5; ++tries)
@@ -738,6 +735,56 @@ namespace Crown
 					stderr.printf("Error: %s\n", e.message);
 				}
 			}
+		}
+
+		private void deploy_game()
+		{
+			FileChooserDialog fcd = new FileChooserDialog("Select destination directory..."
+				, null
+				, FileChooserAction.SELECT_FOLDER
+				, "Cancel"
+				, ResponseType.CANCEL
+				, "Open"
+				, ResponseType.ACCEPT
+				);
+
+			if (fcd.run() == (int)ResponseType.ACCEPT)
+			{
+				GLib.File data_dir = File.new_for_path(fcd.get_filename());
+
+				string args[] =
+				{
+					ENGINE_EXE,
+					"--source-dir", _project.source_dir(),
+					"--map-source-dir", "core", _project.toolchain_dir(),
+					"--data-dir", data_dir.get_path(),
+					"--compile",
+					null
+				};
+
+				GLib.SubprocessLauncher sl = new GLib.SubprocessLauncher(SubprocessFlags.NONE);
+				sl.set_cwd(ENGINE_DIR);
+				try
+				{
+					GLib.Subprocess compiler = sl.spawnv(args);
+					compiler.wait();
+					if (compiler.get_exit_status() == 0)
+					{
+						GLib.File engine_exe = File.new_for_path(ENGINE_EXE);
+						GLib.File engine_exe_dest = File.new_for_path(data_dir.get_path() + "/" + ENGINE_EXE);
+						engine_exe.copy(engine_exe_dest, FileCopyFlags.OVERWRITE);
+
+						_console_view.logi("editor", "Project deployed to `%s`".printf(data_dir.get_path()));
+					}
+				}
+				catch (Error e)
+				{
+					_console_view.logi("editor", "%s".printf(e.message));
+					_console_view.logi("editor", "Failed to deploy project");
+				}
+			}
+
+			fcd.destroy();
 		}
 
 		private void on_engine_view_realized()
@@ -787,9 +834,9 @@ namespace Crown
 			_level.send_level();
 		}
 
-		private void load()
+		private void load_level()
 		{
-			FileChooserDialog fcd = new FileChooserDialog("Open..."
+			FileChooserDialog fcd = new FileChooserDialog("Open Level..."
 				, this
 				, FileChooserAction.OPEN
 				, "Cancel"
@@ -803,13 +850,48 @@ namespace Crown
 			if (fcd.run() == (int)ResponseType.ACCEPT)
 			{
 				string filename = fcd.get_filename();
-				if (filename.has_suffix(".level"))
+				if (filename.has_prefix(_project.source_dir()))
 				{
-					_level_filename = filename;
-					_level.load(_level_filename);
-					_level.send_level();
-					send_state();
+					if (filename.has_suffix(".level") && filename != _level_filename)
+					{
+						_level_filename = filename;
+						_level.load(_level_filename);
+						_level.send_level();
+						send_state();
+					}
 				}
+				else
+				{
+					_console_view.loge("editor", "Level not loaded: file must be within `%s`".printf(_project.source_dir()));
+				}
+			}
+
+			fcd.destroy();
+		}
+
+		private void load_project()
+		{
+			FileChooserDialog fcd = new FileChooserDialog("Open Project..."
+				, this
+				, FileChooserAction.SELECT_FOLDER
+				, "Cancel"
+				, ResponseType.CANCEL
+				, "Open"
+				, ResponseType.ACCEPT
+				);
+
+			if (fcd.run() == (int)ResponseType.ACCEPT)
+			{
+				string filename = fcd.get_filename();
+				_console_view.logi("editor", "Loading project `%s`...".printf(filename));
+				_project.load(filename, _project.toolchain_dir());
+
+				_level_filename = null;
+				_level.load_empty_level();
+				stop_compiler();
+				start_compiler();
+				restart_engine();
+				_resource_browser.restart_engine();
 			}
 
 			fcd.destroy();
@@ -832,11 +914,19 @@ namespace Crown
 
 			if (fcd.run() == (int)ResponseType.ACCEPT)
 			{
-				_level_filename = fcd.get_filename();
-				if (!_level_filename.has_suffix(".level"))
-					_level_filename += ".level";
-				_level.save(_level_filename);
-				saved = true;
+				string filename = fcd.get_filename();
+				if (filename.has_prefix(_project.source_dir()))
+				{
+					_level_filename = filename;
+					if (!_level_filename.has_suffix(".level"))
+						_level_filename += ".level";
+					_level.save(_level_filename);
+					saved = true;
+				}
+				else
+				{
+					_console_view.loge("editor", "Level not saved: file must be within `%s`".printf(_project.source_dir()));
+				}
 			}
 
 			fcd.destroy();
@@ -907,7 +997,7 @@ namespace Crown
 				shutdown();
 		}
 
-		private void on_new()
+		private void on_new_level()
 		{
 			if (!_database.changed())
 			{
@@ -936,11 +1026,11 @@ namespace Crown
 			}
 		}
 
-		private void on_open(Gtk.Action action)
+		private void on_open_level(Gtk.Action action)
 		{
 			if (!_database.changed())
 			{
-				load();
+				load_level();
 				return;
 			}
 
@@ -958,7 +1048,32 @@ namespace Crown
 			md.destroy();
 
 			if (rt == (int)ResponseType.YES && save() || rt == (int)ResponseType.NO)
-				load();
+				load_level();
+		}
+
+		private void on_open_project(Gtk.Action action)
+		{
+			if (!_database.changed())
+			{
+				load_project();
+				return;
+			}
+
+			Gtk.MessageDialog md = new Gtk.MessageDialog(this
+				, Gtk.DialogFlags.MODAL
+				, Gtk.MessageType.WARNING
+				, Gtk.ButtonsType.NONE
+				, "File changed, save?"
+				);
+			md.add_button("Open _without Saving", ResponseType.NO);
+			md.add_button("_Cancel", ResponseType.CANCEL);
+			md.add_button("_Save", ResponseType.YES);
+			md.set_default_response(ResponseType.YES);
+			int rt = md.run();
+			md.destroy();
+
+			if (rt == (int)ResponseType.YES && save() || rt == (int)ResponseType.NO)
+				load_project();
 		}
 
 		private void on_save(Gtk.Action action)
@@ -1096,6 +1211,11 @@ namespace Crown
 			}
 
 			_preferences_dialog.show_all();
+		}
+
+		private void on_deploy(Gtk.Action action)
+		{
+			deploy_game();
 		}
 
 		private void on_quit(Gtk.Action action)
@@ -1326,7 +1446,7 @@ namespace Crown
 			}
 			catch (Error e)
 			{
-				_console_view.loge("Editor", e.message);
+				_console_view.loge("editor", e.message);
 			}
 		}
 
@@ -1338,7 +1458,7 @@ namespace Crown
 			}
 			catch (Error e)
 			{
-				_console_view.loge("Editor", e.message);
+				_console_view.loge("editor", e.message);
 			}
 		}
 
@@ -1351,7 +1471,7 @@ namespace Crown
 			}
 			catch (Error e)
 			{
-				_console_view.loge("Editor", e.message);
+				_console_view.loge("editor", e.message);
 			}
 		}
 
@@ -1374,9 +1494,9 @@ namespace Crown
 			dlg.program_name = "Crown Game Engine";
 			dlg.version = CROWN_VERSION;
 			dlg.website = "https://github.com/dbartolini/crown";
-			dlg.copyright = "Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.";
+			dlg.copyright = "Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.";
 			dlg.license = "Crown Game Engine.\n"
-				+ "Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.\n"
+				+ "Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.\n"
 				+ "\n"
 				+ "This program is free software; you can redistribute it and/or\n"
 				+ "modify it under the terms of the GNU General Public License\n"
@@ -1420,28 +1540,9 @@ namespace Crown
 		Gtk.StyleContext.add_provider_for_screen(screen, provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
 		provider.load_from_resource("/org/crown/ui/theme/style.css");
 
-		try
-		{
-			Gtk.IconTheme.add_builtin_icon("tool-place",      16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/tool-place.png"));
-			Gtk.IconTheme.add_builtin_icon("tool-move",       16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/tool-move.png"));
-			Gtk.IconTheme.add_builtin_icon("tool-rotate",     16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/tool-rotate.png"));
-			Gtk.IconTheme.add_builtin_icon("tool-scale",      16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/tool-scale.png"));
-			Gtk.IconTheme.add_builtin_icon("axis-local",      16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/axis-local.png"));
-			Gtk.IconTheme.add_builtin_icon("axis-world",      16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/axis-world.png"));
-			Gtk.IconTheme.add_builtin_icon("snap-to-grid",    16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/snap-to-grid.png"));
-			Gtk.IconTheme.add_builtin_icon("reference-local", 16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/reference-local.png"));
-			Gtk.IconTheme.add_builtin_icon("reference-world", 16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/reference-world.png"));
-			Gtk.IconTheme.add_builtin_icon("run",             16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/run.png"));
-			Gtk.IconTheme.add_builtin_icon("level-tree",      16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/level-tree.png"));
-			Gtk.IconTheme.add_builtin_icon("level-layers",    16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/level-layers.png"));
-			Gtk.IconTheme.add_builtin_icon("layer-visible",   16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/layer-visible.png"));
-			Gtk.IconTheme.add_builtin_icon("layer-locked",    16, new Pixbuf.from_resource("/org/crown/ui/icons/theme/layer-locked.png"));
-		}
-		catch (Error e)
-		{
-			stderr.printf(e.message);
-		}
+		Gtk.IconTheme.get_default().add_resource_path("/org/crown/ui/icons/theme");
 
+		bool create_initial_files = false;
 		string source_dir = "";
 		if (args.length > 1)
 		{
@@ -1455,8 +1556,40 @@ namespace Crown
 		}
 		else
 		{
-			stdout.printf("You must specify a source directory\n");
-			return -1;
+			FileChooserDialog fcd = new FileChooserDialog("Create new project..."
+				, null
+				, FileChooserAction.SAVE
+				, "Cancel"
+				, ResponseType.CANCEL
+				, "Save"
+				, ResponseType.ACCEPT
+				);
+
+			if (fcd.run() != (int)ResponseType.ACCEPT)
+			{
+				fcd.destroy();
+				return -1;
+			}
+
+			string dir = fcd.get_filename();
+			fcd.destroy();
+
+			if (GLib.FileUtils.test(dir, FileTest.EXISTS) || GLib.FileUtils.test(dir, FileTest.IS_REGULAR))
+			{
+				stdout.printf("Source directory can't be a regular file\n");
+				return -1;
+			}
+
+			source_dir = dir;
+			create_initial_files = true;
+			try
+			{
+				File.new_for_path(source_dir).make_directory();
+			}
+			catch (Error e)
+			{
+				stderr.printf("Error: %s\n", e.message);
+			}
 		}
 
 		string toolchain_dir = "";
@@ -1503,13 +1636,15 @@ namespace Crown
 
 		Project project = new Project();
 		project.load(source_dir, toolchain_dir);
+		if (create_initial_files)
+			project.create_initial_files();
 
 		Database database = new Database();
 		ConsoleClient compiler = new ConsoleClient();
 		ConsoleClient engine = new ConsoleClient();
 		ConsoleClient game = new ConsoleClient();
 
-		Level level = new Level(database, engine, project.source_dir(), project.toolchain_dir());
+		Level level = new Level(database, engine, project);
 		LevelEditor editor = new LevelEditor(project, database, level, compiler, engine, game);
 
 		level.load_empty_level();

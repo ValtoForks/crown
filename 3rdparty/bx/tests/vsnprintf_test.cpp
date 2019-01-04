@@ -5,6 +5,8 @@
 
 #include "test.h"
 #include <bx/string.h>
+#include <bx/readerwriter.h>
+
 #include <limits>
 #include <inttypes.h>
 
@@ -164,4 +166,27 @@ TEST_CASE("vsnprintf", "")
 
 	REQUIRE(test("hello               ", "%-20s", "hello") );
 	REQUIRE(test("hello, world!", "%s, %s!", "hello", "world") );
+
+	bx::StringView str("0hello1world2");
+	bx::StringView hello(str, 1, 5);
+	bx::StringView world(str, 7, 5);
+	REQUIRE(test("hello, world!", "%.*s, %.*s!"
+		, hello.getLength(), hello.getPtr()
+		, world.getLength(), world.getPtr()
+		) );
+}
+
+TEST_CASE("vsnprintf write")
+{
+	char tmp[64];
+	bx::StaticMemoryBlock mb(tmp, sizeof(tmp));
+	bx::MemoryWriter writer(&mb);
+
+	bx::Error err;
+	int32_t len = bx::write(&writer, &err, "%d", 1389);
+	REQUIRE(err.isOk());
+	REQUIRE(len == 4);
+
+	bx::StringView str(tmp, len);
+	REQUIRE(0 == bx::strCmp(str, "1389") );
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -184,20 +184,6 @@ struct CollisionGroup
 		GROUP_29 = 1 << 29,
 		GROUP_30 = 1 << 30,
 		GROUP_31 = 1 << 31
-	};
-};
-
-/// Enumerates raycast modes.
-///
-/// @ingroup World
-struct RaycastMode
-{
-	enum Enum
-	{
-		CLOSEST,
-		ALL,
-
-		COUNT
 	};
 };
 
@@ -443,6 +429,7 @@ struct RaycastHit
 {
 	Vector3 position;    ///< In world-space.
 	Vector3 normal;      ///< In world-space.
+	f32 time;            ///< Time of impact in [0..1].
 	UnitId unit;         ///< The unit that was hit.
 	ActorInstance actor; ///< The actor that was hit.
 };

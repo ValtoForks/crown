@@ -1,25 +1,43 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
 #include "core/error/error.h"
+#include "core/platform.h"
 #include "core/thread/thread.h"
+
+#if CROWN_PLATFORM_POSIX
+	#include <pthread.h>
+#elif CROWN_PLATFORM_WINDOWS
+	#include <windows.h>
+	#include <process.h>
+#endif
 
 namespace crown
 {
+struct Private
+{
+#if CROWN_PLATFORM_POSIX
+	pthread_t handle;
+#elif CROWN_PLATFORM_WINDOWS
+	HANDLE handle;
+#endif
+};
+
 #if CROWN_PLATFORM_POSIX
 static void* thread_proc(void* arg)
 {
-	static s32 result = -1;
-	result = ((Thread*)arg)->run();
-	return (void*)&result;
+	Thread* thread = (Thread*)arg;
+	thread->_sem.post();
+	return (void*)(uintptr_t)thread->_function(thread->_user_data);
 }
 #elif CROWN_PLATFORM_WINDOWS
 static DWORD WINAPI thread_proc(void* arg)
 {
-	s32 result = ((Thread*)arg)->run();
-	return result;
+	Thread* thread = (Thread*)arg;
+	thread->_sem.post();
+	return thread->_function(thread->_user_data);
 }
 #endif
 
@@ -27,12 +45,15 @@ Thread::Thread()
 	: _function(NULL)
 	, _user_data(NULL)
 	, _is_running(false)
-#if CROWN_PLATFORM_POSIX
-	, _handle(0)
-#elif CROWN_PLATFORM_WINDOWS
-	, _handle(INVALID_HANDLE_VALUE)
-#endif
+	, _exit_code(0)
 {
+	Private* priv = (Private*)_data;
+	CE_STATIC_ASSERT(sizeof(_data) >= sizeof(Private));
+#if CROWN_PLATFORM_POSIX
+	priv->handle = 0;
+#elif CROWN_PLATFORM_WINDOWS
+	priv->handle = INVALID_HANDLE_VALUE;
+#endif
 }
 
 Thread::~Thread()
@@ -43,6 +64,8 @@ Thread::~Thread()
 
 void Thread::start(ThreadFunction func, void* user_data, u32 stack_size)
 {
+	Private* priv = (Private*)_data;
+
 	CE_ASSERT(!_is_running, "Thread is already running");
 	CE_ASSERT(func != NULL, "Function must be != NULL");
 	_function = func;
@@ -60,15 +83,15 @@ void Thread::start(ThreadFunction func, void* user_data, u32 stack_size)
 		CE_ASSERT(err == 0, "pthread_attr_setstacksize: errno = %d", err);
 	}
 
-	err = pthread_create(&_handle, &attr, thread_proc, this);
+	err = pthread_create(&priv->handle, &attr, thread_proc, this);
 	CE_ASSERT(err == 0, "pthread_create: errno = %d", err);
 
 	err = pthread_attr_destroy(&attr);
 	CE_ASSERT(err == 0, "pthread_attr_destroy: errno = %d", err);
 	CE_UNUSED(err);
 #elif CROWN_PLATFORM_WINDOWS
-	_handle = CreateThread(NULL, stack_size, thread_proc, this, 0, NULL);
-	CE_ASSERT(_handle != NULL, "CreateThread: GetLastError = %d", GetLastError());
+	priv->handle = CreateThread(NULL, stack_size, thread_proc, this, 0, NULL);
+	CE_ASSERT(priv->handle != NULL, "CreateThread: GetLastError = %d", GetLastError());
 #endif
 
 	_is_running = true;
@@ -77,18 +100,22 @@ void Thread::start(ThreadFunction func, void* user_data, u32 stack_size)
 
 void Thread::stop()
 {
+	Private* priv = (Private*)_data;
+
 	CE_ASSERT(_is_running, "Thread is not running");
 
 #if CROWN_PLATFORM_POSIX
-	int err = pthread_join(_handle, NULL);
+	void* retval;
+	int err = pthread_join(priv->handle, &retval);
 	CE_ASSERT(err == 0, "pthread_join: errno = %d", err);
 	CE_UNUSED(err);
-	_handle = 0;
+	_exit_code = (s32)(uintptr_t)retval;
+	priv->handle = 0;
 #elif CROWN_PLATFORM_WINDOWS
-	WaitForSingleObject(_handle, INFINITE);
-	// GetExitCodeThread(_handle, &m_exit_code);
-	CloseHandle(_handle);
-	_handle = INVALID_HANDLE_VALUE;
+	WaitForSingleObject(priv->handle, INFINITE);
+	GetExitCodeThread(priv->handle, (DWORD*)&_exit_code);
+	CloseHandle(priv->handle);
+	priv->handle = INVALID_HANDLE_VALUE;
 #endif
 
 	_is_running = false;
@@ -99,10 +126,9 @@ bool Thread::is_running()
 	return _is_running;
 }
 
-s32 Thread::run()
+s32 Thread::exit_code()
 {
-	_sem.post();
-	return _function(_user_data);
+	return _exit_code;
 }
 
 } // namespace crown

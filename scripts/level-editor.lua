@@ -1,5 +1,5 @@
 --
--- Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+-- Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
 -- License: https://github.com/dbartolini/crown/blob/master/LICENSE
 --
 
@@ -57,6 +57,7 @@ project "level-editor"
 		"-Wno-unused-variable",
 		"-Wno-unused-parameter",
 		"-Wno-unused-but-set-variable",
+		"-Wno-cast-function-type",
 	}
 
 	buildoptions_vala {

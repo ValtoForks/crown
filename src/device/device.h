@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -55,7 +55,7 @@ struct Device
 	Pipeline* _pipeline;
 	Display* _display;
 	Window* _window;
-	Array<World*> _worlds;
+	ListNode _worlds;
 
 	u16 _width;
 	u16 _height;
@@ -97,8 +97,8 @@ struct Device
 	/// Creates a new world.
 	World* create_world();
 
-	/// Destroys the world @a w.
-	void destroy_world(World& w);
+	/// Destroys the @a world.
+	void destroy_world(World& world);
 
 	/// Returns the resource package @a id.
 	ResourcePackage* create_resource_package(StringId64 id);

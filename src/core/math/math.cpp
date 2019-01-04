@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -14,21 +14,6 @@ bool fequal(f32 a, f32 b, f32 epsilon)
 	return b <= (a + epsilon)
 		&& b >= (a - epsilon)
 		;
-}
-
-f32 fmin(f32 a, f32 b)
-{
-	return a < b ? a : b;
-}
-
-f32 fmax(f32 a, f32 b)
-{
-	return a < b ? b : a;
-}
-
-f32 fclamp(f32 val, f32 min, f32 max)
-{
-	return fmin(fmax(min, val), max);
 }
 
 f32 ffract(f32 a)

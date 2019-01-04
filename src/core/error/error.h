@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -28,7 +28,7 @@ namespace error
 	#define CE_ASSERT(condition, msg, ...)                   \
 		do                                                   \
 		{                                                    \
-			if (!(condition))                                \
+			if (CE_UNLIKELY(!(condition)))                   \
 			{                                                \
 				crown::error::abort("Assertion failed: %s\n" \
 					"    In: %s:%d\n"                        \
@@ -38,6 +38,7 @@ namespace error
 					, __LINE__                               \
 					, ## __VA_ARGS__                         \
 					);                                       \
+				CE_UNREACHABLE();                            \
 			}                                                \
 		} while (0)
 #else

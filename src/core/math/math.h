@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 Daniele Bartolini and individual contributors.
+ * Copyright (c) 2012-2018 Daniele Bartolini and individual contributors.
  * License: https://github.com/dbartolini/crown/blob/master/LICENSE
  */
 
@@ -19,15 +19,6 @@ static const f32 FLOAT_EPSILON = 1.0e-7f;
 
 /// Returns whether @a a and @a b are equal according to @a epsilon.
 bool fequal(f32 a, f32 b, f32 epsilon = FLOAT_EPSILON);
-
-/// Returns the minimum of @a a and @a b.
-f32 fmin(f32 a, f32 b);
-
-/// Returns the maximum of @a a and @a b.
-f32 fmax(f32 a, f32 b);
-
-/// Clamps @a val to @a min and @a max.
-f32 fclamp(f32 val, f32 min, f32 max);
 
 /// Returns the fractional part of @a a.
 f32 ffract(f32 a);

@@ -9,10 +9,21 @@
 
 namespace bx
 {
+	// Reference:
+	// https://web.archive.org/web/20181115035420/http://cnicholson.net/2011/01/stupid-c-tricks-a-better-sizeof_array/
+	template<typename Ty, size_t Num>
+	char(&CountOfRequireArrayArgumentT(const Ty(&)[Num]))[Num];
+
 	template<bool>
 	inline constexpr bool isEnabled()
 	{
 		return true;
+	}
+
+	template<class Ty>
+	inline constexpr bool isTriviallyCopyable()
+	{
+		return __is_trivially_copyable(Ty);
 	}
 
 	template<>
@@ -27,7 +38,7 @@ namespace bx
 	}
 
 	template<typename Ty>
-	inline void xchg(Ty& _a, Ty& _b)
+	inline void swap(Ty& _a, Ty& _b)
 	{
 		Ty tmp = _a; _a = _b; _b = tmp;
 	}

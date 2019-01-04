@@ -1,37 +1,37 @@
-require "core/editors/level_editor/class"
+require "core/lua/class"
 
-FPSCamera = class(FPSCamera)
+Camera = class(Camera)
 
-function FPSCamera:init(world, unit)
+function Camera:init(world, unit)
 	self._world = world
 	self._unit = unit
-	self._translation_speed = 47
-	self._rotation_speed = 0.38
+	self._translation_speed = 20
+	self._rotation_speed = 0.14
 	self._perspective_local_pose = Matrix4x4Box(Matrix4x4.identity())
 end
 
-function FPSCamera:unit()
+function Camera:unit()
 	return self._unit;
 end
 
-function FPSCamera:camera()
+function Camera:camera()
 	return World.camera_instances(self._world, self._unit)
 end
 
-function FPSCamera:local_pose()
+function Camera:local_pose()
 	local sg = World.scene_graph(self._world)
 	return SceneGraph.local_pose(sg, self._unit)
 end
 
-function FPSCamera:is_orthographic()
+function Camera:is_orthographic()
 	return World.camera_projection_type(self._world, self._unit) == "orthographic"
 end
 
-function FPSCamera:mouse_wheel(delta)
+function Camera:mouse_wheel(delta)
 	self._translation_speed = math.max(0.001, self._translation_speed + delta * 0.2)
 end
 
-function FPSCamera:camera_ray(x, y)
+function Camera:camera_ray(x, y)
 	local near = World.camera_screen_to_world(self._world, self._unit, Vector3(x, y, 0))
 	local far = World.camera_screen_to_world(self._world, self._unit, Vector3(x, y, 1))
 	local dir = World.camera_projection_type(self._world, self._unit) == "orthographic"
@@ -40,7 +40,7 @@ function FPSCamera:camera_ray(x, y)
 	return near, dir
 end
 
-function FPSCamera:set_perspective()
+function Camera:set_perspective()
 	if not self:is_orthographic() then
 		return
 	end
@@ -50,7 +50,7 @@ function FPSCamera:set_perspective()
 	World.camera_set_projection_type(self._world, self._unit, "perspective")
 end
 
-function FPSCamera:set_orthographic(world_center, world_radius, dir, up)
+function Camera:set_orthographic(world_center, world_radius, dir, up)
 	if not self:is_orthographic() then
 		self._perspective_local_pose:store(self:local_pose())
 	end
@@ -62,14 +62,14 @@ function FPSCamera:set_orthographic(world_center, world_radius, dir, up)
 	World.camera_set_projection_type(self._world, self._unit, "orthographic")
 end
 
-function FPSCamera:screen_length_to_world_length(position, length)
+function Camera:screen_length_to_world_length(position, length)
 	local right = Matrix4x4.x(self:local_pose())
 	local a = World.camera_world_to_screen(self._world, self._unit, position)
 	local b = World.camera_world_to_screen(self._world, self._unit, position + right)
 	return length / Vector3.distance(a, b)
 end
 
-function FPSCamera:update(dt, dx, dy, keyboard)
+function Camera:update(dt, dx, dy, keyboard, mouse)
 	local sg = World.scene_graph(self._world)
 
 	local camera_local_pose = SceneGraph.local_pose(sg, self._unit)
@@ -81,10 +81,10 @@ function FPSCamera:update(dt, dx, dy, keyboard)
 
 	-- Rotation
 	if dx ~= 0 or dy ~= 0 then
-		if not self:is_orthographic() then
+		if not self:is_orthographic() and mouse.right then
 			local rotation_speed = self._rotation_speed * dt
-			local rotation_around_world_up = Quaternion(Vector3(0, 1, 0), -dx * rotation_speed)
-			local rotation_around_camera_right = Quaternion(camera_right_vector, -dy * rotation_speed)
+			local rotation_around_world_up = Quaternion(Vector3(0, 1, 0), dx * rotation_speed)
+			local rotation_around_camera_right = Quaternion(camera_right_vector, dy * rotation_speed)
 			local rotation = Quaternion.multiply(rotation_around_world_up, rotation_around_camera_right)
 
 			local old_rotation = Matrix4x4.from_quaternion(camera_rotation)
@@ -107,8 +107,8 @@ function FPSCamera:update(dt, dx, dy, keyboard)
 		if keyboard.dkey then camera_position = camera_position + camera_right_vector * translation_speed end
 	else
 		if keyboard.wkey then camera_position = camera_position + camera_view_vector * translation_speed end
-		if keyboard.skey then camera_position = camera_position + camera_view_vector * -translation_speed end
-		if keyboard.akey then camera_position = camera_position + camera_right_vector * -translation_speed end
+		if keyboard.skey then camera_position = camera_position - camera_view_vector * translation_speed end
+		if keyboard.akey then camera_position = camera_position - camera_right_vector * translation_speed end
 		if keyboard.dkey then camera_position = camera_position + camera_right_vector * translation_speed end
 	end
 	SceneGraph.set_local_position(sg, self._unit, camera_position)
